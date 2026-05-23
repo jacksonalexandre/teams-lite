@@ -47,7 +47,6 @@ function TeamsLite() {
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
-  const [showHidden, setShowHidden] = useState(false);
   const [hidingId, setHidingId] = useState<string | null>(null);
 
   // Channels state (flat list across all joined teams, sorted by last activity)
