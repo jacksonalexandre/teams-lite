@@ -567,7 +567,7 @@ function TeamsLite() {
                       return (
                         <div key={m.id} className="flex flex-col gap-3">
                           {showDate && <DateSeparator iso={m.createdDateTime} />}
-                          <MessageBubble m={m} meName={account.name} />
+                          <MessageBubble m={m} meName={account.name} cfg={config} />
                         </div>
                       );
                     })}
