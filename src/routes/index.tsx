@@ -168,20 +168,51 @@ function TeamsLite() {
       : `ch:${selection.teamId}:${selection.channelId}`
     : null;
 
+  const [atBottom, setAtBottom] = useState(true);
+  const [hasNewBelow, setHasNewBelow] = useState(false);
+
   useEffect(() => {
     setMsgsVisibleCount(7);
+    setHasNewBelow(false);
+    setAtBottom(true);
+  }, [selKey]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      setAtBottom(near);
+      if (near) setHasNewBelow(false);
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
   }, [selKey]);
 
   useEffect(() => {
     const lastId = messages[messages.length - 1]?.id ?? null;
     const selChanged = prevSelKeyRef.current !== selKey;
     const newMessage = prevLastMsgIdRef.current !== lastId;
-    if (selChanged || newMessage) {
+    if (selChanged) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    } else if (newMessage) {
+      if (atBottom) {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      } else if (prevLastMsgIdRef.current !== null) {
+        setHasNewBelow(true);
+      }
     }
     prevSelKeyRef.current = selKey;
     prevLastMsgIdRef.current = lastId;
-  }, [messages, selKey]);
+  }, [messages, selKey, atBottom]);
+
+  function scrollToBottom() {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setHasNewBelow(false);
+  }
+
 
   const meId = useMemo(() => account?.oid, [account]);
 
@@ -465,6 +496,7 @@ function TeamsLite() {
                   {headerTitle}
                 </div>
               )}
+              <div className="relative flex min-h-0 flex-1 flex-col">
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
                 {loadingMsgs && messages.length === 0 ? (
                   <EmptyHint text="Carregando mensagens…" />
@@ -494,6 +526,15 @@ function TeamsLite() {
                         />
                       ))}
                   </>
+                )}
+              </div>
+                {hasNewBelow && !atBottom && (
+                  <button
+                    onClick={scrollToBottom}
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-md hover:bg-muted"
+                  >
+                    ↓ Novas mensagens
+                  </button>
                 )}
               </div>
               <div className="border-t border-border bg-card px-4 py-3">
