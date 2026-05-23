@@ -24,7 +24,7 @@ export const GRAPH_SCOPES = [
 let pca: PublicClientApplication | null = null;
 let initialized = false;
 
-export function getMsal(cfg: TeamsConfig) {
+function getMsal(cfg: TeamsConfig) {
   if (!pca) {
     const config: Configuration = {
       auth: {
