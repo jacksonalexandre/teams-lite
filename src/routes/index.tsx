@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { Archive, ArchiveRestore } from "lucide-react";
 import {
   signIn,
   signOut,
@@ -14,6 +15,7 @@ import {
   listMessages,
   sendMessage,
   chatTitle,
+  hideChat,
   listJoinedTeams,
   listChannels,
   listChannelMessages,
@@ -34,24 +36,6 @@ type Selection =
   | { kind: "channel"; teamId: string; channelId: string }
   | null;
 
-const ARCHIVE_KEY = "teamslite.archivedChats";
-
-function loadArchived(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(ARCHIVE_KEY);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveArchived(s: Set<string>) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ARCHIVE_KEY, JSON.stringify([...s]));
-}
-
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
@@ -62,8 +46,8 @@ function TeamsLite() {
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
-  const [archived, setArchived] = useState<Set<string>>(() => loadArchived());
-  const [showArchived, setShowArchived] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [hidingId, setHidingId] = useState<string | null>(null);
 
   // Channels state
   const [teams, setTeams] = useState<GraphTeam[]>([]);
