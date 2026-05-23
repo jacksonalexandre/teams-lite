@@ -60,7 +60,7 @@ export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
 
 export async function hideChat(cfg: TeamsConfig, chatId: string, hide: boolean) {
   const token = await getAccessToken(cfg);
-  const res = await fetch(`${GRAPH}/me/chats/${chatId}/hideForUser`, {
+  const res = await fetch(`${GRAPH}/chats/${chatId}/hideForUser`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
