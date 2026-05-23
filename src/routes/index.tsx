@@ -91,8 +91,19 @@ function TeamsLite() {
   }, [config, activeId]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
+    setMsgsVisibleCount(7);
+  }, [activeId]);
+
+  useEffect(() => {
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const chatChanged = prevActiveIdRef.current !== activeId;
+    const newMessage = prevLastMsgIdRef.current !== lastId;
+    if (chatChanged || newMessage) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+    prevActiveIdRef.current = activeId;
+    prevLastMsgIdRef.current = lastId;
+  }, [messages, activeId]);
 
   const meId = useMemo(() => {
     return account?.oid;
