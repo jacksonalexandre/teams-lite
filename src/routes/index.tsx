@@ -212,14 +212,6 @@ function TeamsLite() {
               <EmptyHint text="Nenhum chat encontrado." />
             ) : (
               <>
-                {chats.length > visibleCount && (
-                  <button
-                    onClick={() => setVisibleCount((n) => n + 7)}
-                    className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-                  >
-                    Carregar mais ({chats.length - visibleCount} restantes)
-                  </button>
-                )}
                 {chats.slice(0, visibleCount).map((c) => {
                   const title = chatTitle(c, meId, account.name);
                   const active = c.id === activeId;
@@ -239,6 +231,14 @@ function TeamsLite() {
                     </button>
                   );
                 })}
+                {chats.length > visibleCount && (
+                  <button
+                    onClick={() => setVisibleCount((n) => n + 7)}
+                    className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Carregar mais ({chats.length - visibleCount} restantes)
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -261,7 +261,19 @@ function TeamsLite() {
                 ) : messages.length === 0 ? (
                   <EmptyHint text="Sem mensagens ainda." />
                 ) : (
-                  messages.map((m) => <MessageBubble key={m.id} m={m} meName={account.name} />)
+                  <>
+                    {messages.length > msgsVisibleCount && (
+                      <button
+                        onClick={() => setMsgsVisibleCount((n) => n + 7)}
+                        className="mx-auto block rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Carregar mais ({messages.length - msgsVisibleCount} restantes)
+                      </button>
+                    )}
+                    {messages.slice(-msgsVisibleCount).map((m) => (
+                      <MessageBubble key={m.id} m={m} meName={account.name} />
+                    ))}
+                  </>
                 )}
               </div>
               <div className="border-t border-border bg-card px-4 py-3">
