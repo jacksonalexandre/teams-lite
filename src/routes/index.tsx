@@ -383,7 +383,7 @@ function TeamsLite() {
                 mode === "chats" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"
               }`}
             >
-              Conversas
+              Chats
             </button>
             <button
               onClick={() => setMode("channels")}
