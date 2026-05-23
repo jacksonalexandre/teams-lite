@@ -53,7 +53,7 @@ export type GraphMessage = {
 export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
   const data = await graphFetch(
     cfg,
-    "/me/chats?$expand=members&$orderby=lastMessagePreview/createdDateTime desc&$top=50",
+    "/me/chats?$expand=members,lastMessagePreview&$orderby=lastMessagePreview/createdDateTime desc&$top=50",
   );
   return data.value as GraphChat[];
 }
