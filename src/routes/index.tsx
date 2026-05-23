@@ -206,12 +206,10 @@ function TeamsLite() {
     }
   }
 
-  const filteredChats = useMemo(() => {
-    return chats.filter((c) => {
-      const hidden = !!c.viewpoint?.isHidden;
-      return showHidden ? hidden : !hidden;
-    });
-  }, [chats, showHidden]);
+  const filteredChats = useMemo(
+    () => chats.filter((c) => !c.viewpoint?.isHidden),
+    [chats],
+  );
 
   async function handleSignIn() {
     if (!config) return;
