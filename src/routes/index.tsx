@@ -49,12 +49,11 @@ function TeamsLite() {
   const [showHidden, setShowHidden] = useState(false);
   const [hidingId, setHidingId] = useState<string | null>(null);
 
-  // Channels state
-  const [teams, setTeams] = useState<GraphTeam[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
-  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
-  const [channelsByTeam, setChannelsByTeam] = useState<Record<string, GraphChannel[]>>({});
-  const [loadingChannels, setLoadingChannels] = useState<Record<string, boolean>>({});
+  // Channels state (flat list across all joined teams, sorted by last activity)
+  const [channelList, setChannelList] = useState<
+    Array<{ team: GraphTeam; channel: GraphChannel; lastDate: string | null }>
+  >([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
 
   // Selection + messages
   const [selection, setSelection] = useState<Selection>(null);
