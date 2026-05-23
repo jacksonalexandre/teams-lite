@@ -208,8 +208,8 @@ function TeamsLite() {
                   >
                     <span className="line-clamp-1 font-medium">{title}</span>
                     <span className="text-[11px] text-muted-foreground">
-                      {c.chatType === "group" ? "Grupo · " : ""}
-                      {formatDate(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
+                      {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
+                      {c.chatType === "group" ? " · Grupo" : ""}
                     </span>
                   </button>
                 );
@@ -292,7 +292,7 @@ function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
         {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
         <div className="whitespace-pre-wrap break-words">{text}</div>
         <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-          {formatTime(m.createdDateTime)}
+          {formatDateTime(m.createdDateTime)}
         </div>
       </div>
     </div>
@@ -306,22 +306,16 @@ function stripHtml(html: string) {
   return div.textContent || div.innerText || "";
 }
 
-function formatTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
-function formatDate(iso: string) {
+function formatDateTime(iso: string) {
   try {
     const d = new Date(iso);
     const today = new Date();
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     if (d.toDateString() === today.toDateString()) {
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return time;
     }
-    return d.toLocaleDateString();
+    const date = d.toLocaleDateString();
+    return `${date} ${time}`;
   } catch {
     return "";
   }
