@@ -76,7 +76,10 @@ function TeamsLite() {
         return ensureInit(cfg).then(() => getCurrentAccount(cfg));
       })
       .then((acc) => {
-        if (acc) setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
+        if (acc) {
+          const claims = (acc as any).idTokenClaims ?? {};
+          setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || acc.tenantId });
+        }
       })
       .catch((e) => setError(String(e)));
   }, []); // eslint-disable-line
