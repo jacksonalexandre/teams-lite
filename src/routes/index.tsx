@@ -630,13 +630,15 @@ function EmptyHint({ text }: { text: string }) {
   return <div className="px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>;
 }
 
-function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
+function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
   const text = m.body.contentType === "html" ? stripHtml(m.body.content) : m.body.content;
   if (!text.trim()) return null;
+  const fromUserId = m.from?.user?.id ?? undefined;
   return (
-    <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+      {!mine && <Avatar name={author} userId={fromUserId} cfg={cfg} size={28} />}
       <div
         className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
           mine
