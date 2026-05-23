@@ -145,6 +145,23 @@ export async function listChannelMessages(
   return (data.value as GraphMessage[]).slice().reverse();
 }
 
+export async function getChannelLastMessageDate(
+  cfg: TeamsConfig,
+  teamId: string,
+  channelId: string,
+): Promise<string | null> {
+  try {
+    const data = await graphFetch(
+      cfg,
+      `/teams/${teamId}/channels/${channelId}/messages/delta?$top=1`,
+    );
+    const first = (data.value as GraphMessage[])[0];
+    return first?.createdDateTime ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendChannelMessage(
   cfg: TeamsConfig,
   teamId: string,
