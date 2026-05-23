@@ -44,7 +44,6 @@ export function getMsal(cfg: TeamsConfig) {
       },
       cache: {
         cacheLocation: "localStorage",
-        storeAuthStateInCookie: false,
       },
     };
     pca = new PublicClientApplication(config);
