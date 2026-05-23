@@ -117,7 +117,8 @@ function TeamsLite() {
           const bd = b.lastDate ? new Date(b.lastDate).getTime() : 0;
           return bd - ad;
         });
-        if (!cancelled) setChannelList(withDates);
+        const top12 = withDates.filter((x) => x.lastDate).slice(0, 12);
+        if (!cancelled) setChannelList(top12);
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
@@ -359,10 +360,11 @@ function TeamsLite() {
                     >
                       <button
                         onClick={() => setSelection({ kind: "chat", chatId: c.id })}
-                        className="flex min-w-0 flex-1 flex-col items-start gap-1"
+                        className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
+                        title={title}
                       >
-                        <span className="line-clamp-1 font-medium">{title}</span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="line-clamp-1 w-full text-left font-medium">{title}</span>
+                        <span className="w-full text-left text-[11px] text-muted-foreground">
                           {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
                           {c.chatType === "group" ? " · Grupo" : ""}
                         </span>
@@ -374,7 +376,7 @@ function TeamsLite() {
                         }}
                         disabled={isBusy}
                         title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-1 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
                       >
                         {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                       </button>
@@ -398,14 +400,15 @@ function TeamsLite() {
                     onClick={() =>
                       setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })
                     }
-                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                    title={`${team.displayName} · #${channel.displayName}`}
+                    className={`flex w-full min-w-0 flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
                       active ? "bg-muted" : "hover:bg-muted/60"
                     }`}
                   >
-                    <span className="line-clamp-1 font-medium">
+                    <span className="line-clamp-1 w-full text-left font-medium">
                       <span className="text-muted-foreground">#</span> {channel.displayName}
                     </span>
-                    <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                    <span className="line-clamp-1 w-full text-left text-[11px] text-muted-foreground">
                       {lastDate ? formatDateTime(lastDate) : "Sem mensagens"} · {team.displayName}
                     </span>
                   </button>
