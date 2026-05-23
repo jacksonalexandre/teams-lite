@@ -375,7 +375,7 @@ function TeamsLite() {
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar */}
-        <aside className="flex w-72 flex-col border-r border-border bg-card">
+        <aside className="flex w-80 flex-col border-r border-border bg-card">
           <div className="flex border-b border-border">
             <button
               onClick={() => setMode("chats")}
@@ -383,7 +383,7 @@ function TeamsLite() {
                 mode === "chats" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"
               }`}
             >
-              Conversas
+              Chats
             </button>
             <button
               onClick={() => setMode("channels")}
@@ -410,35 +410,57 @@ function TeamsLite() {
                   const active = selection?.kind === "chat" && selection.chatId === c.id;
                   const isHidden = !!c.viewpoint?.isHidden;
                   const isBusy = hidingId === c.id;
+                  const preview = c.lastMessagePreview;
+                  const previewAuthor = preview?.from?.user?.displayName;
+                  const previewIsMe = !!account.name && previewAuthor === account.name;
+                  const previewText = preview?.body?.content
+                    ? preview.body.contentType === "html"
+                      ? stripHtml(preview.body.content)
+                      : preview.body.content
+                    : "";
+                  const previewPrefix = previewIsMe
+                    ? "Você: "
+                    : previewAuthor
+                      ? `${previewAuthor.split(" ")[0]}: `
+                      : "";
+                  const isGroup = c.chatType === "group" || c.chatType === "meeting";
                   return (
                     <div
                       key={c.id}
-                      className={`group flex w-full items-start gap-2 border-b border-border px-3 py-3 text-left text-sm transition-colors ${
+                      onClick={() => setSelection({ kind: "chat", chatId: c.id })}
+                      className={`group flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-2.5 text-sm transition-colors ${
                         active ? "bg-muted" : "hover:bg-muted/60"
                       }`}
+                      title={title}
                     >
-                      <button
-                        onClick={() => setSelection({ kind: "chat", chatId: c.id })}
-                        className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
-                        title={title}
-                      >
-                        <span className="line-clamp-1 w-full text-left font-medium">{title}</span>
-                        <span className="w-full text-left text-[11px] text-muted-foreground">
-                          {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
-                          {c.chatType === "group" ? " · Grupo" : ""}
-                        </span>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleHide(c.id, isHidden);
-                        }}
-                        disabled={isBusy}
-                        title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
-                      >
-                        {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
-                      </button>
+                      <Avatar name={title} isGroup={isGroup} />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-left font-semibold text-foreground" title={title}>
+                            {title}
+                          </span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {formatListDate(preview?.createdDateTime ?? c.lastUpdatedDateTime)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-left text-xs text-muted-foreground">
+                            {previewPrefix}
+                            {previewText || (isGroup ? "Grupo" : "")}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleHide(c.id, isHidden);
+                            }}
+                            disabled={isBusy}
+                            title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
+                          >
+                            {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })
@@ -453,24 +475,33 @@ function TeamsLite() {
                   selection?.kind === "channel" &&
                   selection.teamId === team.id &&
                   selection.channelId === channel.id;
+                const fullTitle = `${team.displayName} · #${channel.displayName}`;
                 return (
-                  <button
+                  <div
                     key={`${team.id}:${channel.id}`}
                     onClick={() =>
                       setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })
                     }
-                    title={`${team.displayName} · #${channel.displayName}`}
-                    className={`flex w-full min-w-0 flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                    title={fullTitle}
+                    className={`flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-2.5 text-sm transition-colors ${
                       active ? "bg-muted" : "hover:bg-muted/60"
                     }`}
                   >
-                    <span className="line-clamp-1 w-full text-left font-medium">
-                      <span className="text-muted-foreground">#</span> {channel.displayName}
-                    </span>
-                    <span className="line-clamp-1 w-full text-left text-[11px] text-muted-foreground">
-                      {lastDate ? formatDateTime(lastDate) : "Sem mensagens"} · {team.displayName}
-                    </span>
-                  </button>
+                    <Avatar name={team.displayName} isGroup />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-left font-semibold text-foreground" title={fullTitle}>
+                          {team.displayName}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {lastDate ? formatListDate(lastDate) : ""}
+                        </span>
+                      </div>
+                      <span className="truncate text-left text-xs text-muted-foreground" title={fullTitle}>
+                        #{channel.displayName}
+                      </span>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -716,3 +747,61 @@ function formatDateTime(iso: string) {
     return "";
   }
 }
+
+function formatListDate(iso?: string | null) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((today.getTime() - dDay.getTime()) / 86400000);
+    if (diffDays === 0) {
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    if (diffDays === 1) return "Ontem";
+    if (diffDays < 7) {
+      return d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+    }
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function colorFromName(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue} 55% 45%)`;
+}
+
+function Avatar({ name, isGroup }: { name: string; isGroup?: boolean }) {
+  const bg = colorFromName(name || "?");
+  return (
+    <div
+      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
+      style={{ backgroundColor: bg }}
+      aria-hidden
+    >
+      {isGroup ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="8.5" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ) : (
+        initials(name)
+      )}
+    </div>
+  );
+}
+
