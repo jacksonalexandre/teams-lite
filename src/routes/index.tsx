@@ -512,9 +512,16 @@ function TeamsLite() {
                         Carregar mais ({messages.length - msgsVisibleCount} restantes)
                       </button>
                     )}
-                    {messages.slice(-msgsVisibleCount).map((m) => (
-                      <MessageBubble key={m.id} m={m} meName={account.name} />
-                    ))}
+                    {messages.slice(-msgsVisibleCount).map((m, i, arr) => {
+                      const prev = arr[i - 1];
+                      const showDate = !prev || toDateKey(m.createdDateTime) !== toDateKey(prev.createdDateTime);
+                      return (
+                        <div key={m.id} className="flex flex-col gap-3">
+                          {showDate && <DateSeparator iso={m.createdDateTime} />}
+                          <MessageBubble m={m} meName={account.name} />
+                        </div>
+                      );
+                    })}
                     {pending
                       .filter((p) => p.selKey === selKey)
                       .map((p) => (
