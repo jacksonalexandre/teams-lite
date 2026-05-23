@@ -117,7 +117,8 @@ function TeamsLite() {
           const bd = b.lastDate ? new Date(b.lastDate).getTime() : 0;
           return bd - ad;
         });
-        if (!cancelled) setChannelList(withDates);
+        const top12 = withDates.filter((x) => x.lastDate).slice(0, 12);
+        if (!cancelled) setChannelList(top12);
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
