@@ -157,7 +157,7 @@ function TeamsLite() {
   }, [config, account, mode]);
 
 
-  // Load messages (chat or channel) + poll
+  // Load messages (chat or channel) + poll (paused when tab is hidden)
   useEffect(() => {
     if (!config || !selection) {
       setMessages([]);
@@ -173,16 +173,25 @@ function TeamsLite() {
             : await listChannelMessages(config, selection.teamId, selection.channelId);
         if (!cancelled) setMessages(msgs);
       } catch (e) {
-        if (!cancelled) setError(String(e));
+        if (!cancelled && showLoader) setError(String(e));
       } finally {
         if (!cancelled && showLoader) setLoadingMsgs(false);
       }
     };
     load(true);
-    const t = setInterval(() => load(false), 5000);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      load(false);
+    };
+    const interval = setInterval(tick, 4000);
+    const onVisible = () => {
+      if (typeof document !== "undefined" && !document.hidden) load(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [config, selection]);
 
