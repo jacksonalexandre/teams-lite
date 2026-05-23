@@ -20,6 +20,7 @@ import {
   listChannels,
   listChannelMessages,
   sendChannelMessage,
+  getChannelLastMessageDate,
   type GraphChat,
   type GraphMessage,
   type GraphTeam,
@@ -46,15 +47,13 @@ function TeamsLite() {
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
-  const [showHidden, setShowHidden] = useState(false);
   const [hidingId, setHidingId] = useState<string | null>(null);
 
-  // Channels state
-  const [teams, setTeams] = useState<GraphTeam[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
-  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
-  const [channelsByTeam, setChannelsByTeam] = useState<Record<string, GraphChannel[]>>({});
-  const [loadingChannels, setLoadingChannels] = useState<Record<string, boolean>>({});
+  // Channels state (flat list across all joined teams, sorted by last activity)
+  const [channelList, setChannelList] = useState<
+    Array<{ team: GraphTeam; channel: GraphChannel; lastDate: string | null }>
+  >([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
 
   // Selection + messages
   const [selection, setSelection] = useState<Selection>(null);
@@ -93,35 +92,45 @@ function TeamsLite() {
       .finally(() => setLoadingChats(false));
   }, [config, account, mode]); // eslint-disable-line
 
-  // Load teams
+  // Load all channels across joined teams, sorted by last activity
   useEffect(() => {
     if (!config || !account || mode !== "channels") return;
-    setLoadingTeams(true);
-    listJoinedTeams(config)
-      .then((ts) => setTeams(ts))
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoadingTeams(false));
+    let cancelled = false;
+    setLoadingChannels(true);
+    (async () => {
+      try {
+        const ts = await listJoinedTeams(config);
+        const channelsPerTeam = await Promise.all(
+          ts.map((t) =>
+            listChannels(config, t.id)
+              .then((chs) => chs.map((channel) => ({ team: t, channel })))
+              .catch(() => [] as Array<{ team: GraphTeam; channel: GraphChannel }>),
+          ),
+        );
+        const flat = channelsPerTeam.flat();
+        const withDates = await Promise.all(
+          flat.map(async (item) => ({
+            ...item,
+            lastDate: await getChannelLastMessageDate(config, item.team.id, item.channel.id),
+          })),
+        );
+        withDates.sort((a, b) => {
+          const ad = a.lastDate ? new Date(a.lastDate).getTime() : 0;
+          const bd = b.lastDate ? new Date(b.lastDate).getTime() : 0;
+          return bd - ad;
+        });
+        if (!cancelled) setChannelList(withDates);
+      } catch (e) {
+        if (!cancelled) setError(String(e));
+      } finally {
+        if (!cancelled) setLoadingChannels(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [config, account, mode]);
 
-  async function toggleTeam(teamId: string) {
-    if (!config) return;
-    if (expandedTeam === teamId) {
-      setExpandedTeam(null);
-      return;
-    }
-    setExpandedTeam(teamId);
-    if (!channelsByTeam[teamId]) {
-      setLoadingChannels((p) => ({ ...p, [teamId]: true }));
-      try {
-        const chs = await listChannels(config, teamId);
-        setChannelsByTeam((p) => ({ ...p, [teamId]: chs }));
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoadingChannels((p) => ({ ...p, [teamId]: false }));
-      }
-    }
-  }
 
   // Load messages (chat or channel) + poll
   useEffect(() => {
@@ -197,12 +206,10 @@ function TeamsLite() {
     }
   }
 
-  const filteredChats = useMemo(() => {
-    return chats.filter((c) => {
-      const hidden = !!c.viewpoint?.isHidden;
-      return showHidden ? hidden : !hidden;
-    });
-  }, [chats, showHidden]);
+  const filteredChats = useMemo(
+    () => chats.filter((c) => !c.viewpoint?.isHidden),
+    [chats],
+  );
 
   async function handleSignIn() {
     if (!config) return;
@@ -221,7 +228,7 @@ function TeamsLite() {
       await signOut(config);
       setAccount(null);
       setChats([]);
-      setTeams([]);
+      setChannelList([]);
       setMessages([]);
       setSelection(null);
     } catch (e) {
@@ -258,10 +265,11 @@ function TeamsLite() {
       const c = chats.find((x) => x.id === selection.chatId);
       return c ? chatTitle(c, meId, account?.name) : "";
     }
-    const team = teams.find((t) => t.id === selection.teamId);
-    const ch = channelsByTeam[selection.teamId]?.find((c) => c.id === selection.channelId);
-    return team && ch ? `${team.displayName} · ${ch.displayName}` : "";
-  }, [selection, chats, teams, channelsByTeam, meId, account]);
+    const item = channelList.find(
+      (x) => x.team.id === selection.teamId && x.channel.id === selection.channelId,
+    );
+    return item ? `${item.team.displayName} · ${item.channel.displayName}` : "";
+  }, [selection, chats, channelList, meId, account]);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -329,22 +337,6 @@ function TeamsLite() {
             </button>
           </div>
 
-          {mode === "chats" && account && (
-            <div className="flex items-center justify-between border-b border-border px-4 py-2">
-              <span className="text-[11px] text-muted-foreground">
-                {showHidden ? "Ocultos" : "Ativos"} ({filteredChats.length})
-              </span>
-              <button
-                onClick={() => {
-                  setShowHidden((v) => !v);
-                  setVisibleCount(7);
-                }}
-                className="text-[11px] font-medium text-primary hover:underline"
-              >
-                {showHidden ? "Ver ativos" : "Ver ocultos"}
-              </button>
-            </div>
-          )}
 
           <div className="flex-1 overflow-y-auto">
             {!account ? (
@@ -353,7 +345,7 @@ function TeamsLite() {
               loadingChats ? (
                 <EmptyHint text="Carregando…" />
               ) : filteredChats.length === 0 ? (
-                <EmptyHint text={showHidden ? "Nenhum chat oculto." : "Nenhum chat encontrado."} />
+                <EmptyHint text="Nenhum chat encontrado." />
               ) : (
                 <>
                   {filteredChats.slice(0, visibleCount).map((c) => {
@@ -402,54 +394,33 @@ function TeamsLite() {
                   )}
                 </>
               )
-            ) : loadingTeams ? (
-              <EmptyHint text="Carregando equipes…" />
-            ) : teams.length === 0 ? (
-              <EmptyHint text="Nenhuma equipe encontrada." />
+            ) : loadingChannels ? (
+              <EmptyHint text="Carregando canais…" />
+            ) : channelList.length === 0 ? (
+              <EmptyHint text="Nenhum canal encontrado." />
             ) : (
-              teams.map((t) => {
-                const open = expandedTeam === t.id;
-                const chs = channelsByTeam[t.id];
+              channelList.map(({ team, channel, lastDate }) => {
+                const active =
+                  selection?.kind === "channel" &&
+                  selection.teamId === team.id &&
+                  selection.channelId === channel.id;
                 return (
-                  <div key={t.id} className="border-b border-border">
-                    <button
-                      onClick={() => toggleTeam(t.id)}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium hover:bg-muted/60"
-                    >
-                      <span className="line-clamp-1">{t.displayName}</span>
-                      <span className="text-xs text-muted-foreground">{open ? "▾" : "▸"}</span>
-                    </button>
-                    {open && (
-                      <div className="bg-background/40">
-                        {loadingChannels[t.id] ? (
-                          <EmptyHint text="Carregando canais…" />
-                        ) : chs && chs.length > 0 ? (
-                          chs.map((ch) => {
-                            const active =
-                              selection?.kind === "channel" &&
-                              selection.teamId === t.id &&
-                              selection.channelId === ch.id;
-                            return (
-                              <button
-                                key={ch.id}
-                                onClick={() =>
-                                  setSelection({ kind: "channel", teamId: t.id, channelId: ch.id })
-                                }
-                                className={`flex w-full items-center gap-2 px-6 py-2 text-left text-sm transition-colors ${
-                                  active ? "bg-muted" : "hover:bg-muted/60"
-                                }`}
-                              >
-                                <span className="text-muted-foreground">#</span>
-                                <span className="line-clamp-1">{ch.displayName}</span>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <EmptyHint text="Sem canais." />
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    key={`${team.id}:${channel.id}`}
+                    onClick={() =>
+                      setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })
+                    }
+                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                      active ? "bg-muted" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className="line-clamp-1 font-medium">
+                      <span className="text-muted-foreground">#</span> {channel.displayName}
+                    </span>
+                    <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                      {lastDate ? formatDateTime(lastDate) : "Sem mensagens"} · {team.displayName}
+                    </span>
+                  </button>
                 );
               })
             )}

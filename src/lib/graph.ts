@@ -53,7 +53,7 @@ export type GraphMessage = {
 export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
   const data = await graphFetch(
     cfg,
-    "/me/chats?$expand=members&$orderby=lastMessagePreview/createdDateTime desc&$top=50",
+    "/me/chats?$expand=members,lastMessagePreview&$orderby=lastMessagePreview/createdDateTime desc&$top=50",
   );
   return data.value as GraphChat[];
 }
@@ -143,6 +143,23 @@ export async function listChannelMessages(
     `/teams/${teamId}/channels/${channelId}/messages?$top=50`,
   );
   return (data.value as GraphMessage[]).slice().reverse();
+}
+
+export async function getChannelLastMessageDate(
+  cfg: TeamsConfig,
+  teamId: string,
+  channelId: string,
+): Promise<string | null> {
+  try {
+    const data = await graphFetch(
+      cfg,
+      `/teams/${teamId}/channels/${channelId}/messages/delta?$top=1`,
+    );
+    const first = (data.value as GraphMessage[])[0];
+    return first?.createdDateTime ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function sendChannelMessage(
