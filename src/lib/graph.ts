@@ -31,6 +31,7 @@ export type GraphChat = {
   chatType: "oneOnOne" | "group" | "meeting" | string;
   lastUpdatedDateTime: string;
   members?: GraphChatMember[];
+  viewpoint?: { isHidden?: boolean; lastMessageReadDateTime?: string } | null;
   lastMessagePreview?: {
     createdDateTime?: string;
     from?: {
@@ -56,6 +57,26 @@ export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
   );
   return data.value as GraphChat[];
 }
+
+export async function hideChat(cfg: TeamsConfig, chatId: string, hide: boolean) {
+  const token = await getAccessToken(cfg);
+  const res = await fetch(`${GRAPH}/me/chats/${chatId}/hideForUser`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user: { "@odata.id": `https://graph.microsoft.com/v1.0/me` },
+      hideForUser: hide,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Graph ${res.status}: ${body}`);
+  }
+}
+
 
 export async function listMessages(cfg: TeamsConfig, chatId: string): Promise<GraphMessage[]> {
   const data = await graphFetch(cfg, `/me/chats/${chatId}/messages?$top=50`);
