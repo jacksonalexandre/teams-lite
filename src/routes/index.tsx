@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [account, setAccount] = useState<{ name?: string; username: string } | null>(null);
+  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string } | null>(null);
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<GraphMessage[]>([]);
@@ -44,7 +44,7 @@ function TeamsLite() {
         return ensureInit(cfg).then(() => getCurrentAccount(cfg));
       })
       .then((acc) => {
-        if (acc) setAccount({ name: acc.name, username: acc.username });
+        if (acc) setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
       })
       .catch((e) => setError(String(e)));
   }, []); // eslint-disable-line
@@ -90,7 +90,7 @@ function TeamsLite() {
   }, [messages]);
 
   const meId = useMemo(() => {
-    return account?.username;
+    return account?.oid;
   }, [account]);
 
   async function handleSignIn() {
@@ -98,7 +98,7 @@ function TeamsLite() {
     setError(null);
     try {
       const acc = await signIn(config);
-      setAccount({ name: acc.name, username: acc.username });
+      setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
     } catch (e) {
       setError(String(e));
     }
@@ -208,8 +208,7 @@ function TeamsLite() {
                   >
                     <span className="line-clamp-1 font-medium">{title}</span>
                     <span className="text-[11px] text-muted-foreground">
-                      {c.chatType === "oneOnOne" ? "1:1" : c.chatType === "group" ? "Grupo" : c.chatType}
-                      {" · "}
+                      {c.chatType === "group" ? "Grupo · " : ""}
                       {formatDate(c.lastUpdatedDateTime)}
                     </span>
                   </button>
