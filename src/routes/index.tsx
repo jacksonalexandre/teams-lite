@@ -44,7 +44,7 @@ function TeamsLite() {
         return ensureInit(cfg).then(() => getCurrentAccount(cfg));
       })
       .then((acc) => {
-        if (acc) setAccount({ name: acc.name, username: acc.username });
+        if (acc) setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
       })
       .catch((e) => setError(String(e)));
   }, []); // eslint-disable-line
