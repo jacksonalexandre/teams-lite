@@ -90,7 +90,7 @@ function TeamsLite() {
   }, [messages]);
 
   const meId = useMemo(() => {
-    return account?.username;
+    return account?.oid;
   }, [account]);
 
   async function handleSignIn() {
