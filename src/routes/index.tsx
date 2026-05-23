@@ -34,6 +34,7 @@ function TeamsLite() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(7);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Boot: load config from server then try existing account
