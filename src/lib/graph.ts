@@ -19,12 +19,25 @@ async function graphFetch(cfg: TeamsConfig, path: string, init: RequestInit = {}
   return res.json();
 }
 
+export type GraphChatMember = {
+  displayName?: string | null;
+  userId?: string | null;
+  email?: string | null;
+};
+
 export type GraphChat = {
   id: string;
   topic: string | null;
   chatType: "oneOnOne" | "group" | "meeting" | string;
   lastUpdatedDateTime: string;
-  members?: Array<{ displayName?: string; userId?: string }>;
+  members?: GraphChatMember[];
+  lastMessagePreview?: {
+    createdDateTime?: string;
+    from?: {
+      user?: { displayName?: string; id?: string };
+    } | null;
+    body?: { content?: string; contentType?: string };
+  } | null;
 };
 
 export type GraphMessage = {
@@ -59,11 +72,18 @@ export async function sendMessage(cfg: TeamsConfig, chatId: string, text: string
   });
 }
 
-export function chatTitle(chat: GraphChat, meId?: string): string {
+export function chatTitle(chat: GraphChat, meId?: string, meName?: string): string {
   if (chat.topic) return chat.topic;
-  const others = (chat.members ?? []).filter((m) => m.userId !== meId);
+  const others = (chat.members ?? []).filter((m) => !meId || m.userId !== meId);
   const names = others.map((m) => m.displayName).filter(Boolean) as string[];
-  if (names.length === 0) return "(sem título)";
-  if (names.length <= 2) return names.join(", ");
-  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+  if (names.length > 0) {
+    if (names.length <= 2) return names.join(", ");
+    return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+  }
+  // Fallbacks for external/guest users where members lack displayName
+  const previewName = chat.lastMessagePreview?.from?.user?.displayName;
+  if (previewName && previewName !== meName) return previewName;
+  const emails = others.map((m) => m.email).filter(Boolean) as string[];
+  if (emails.length > 0) return emails.join(", ");
+  return "Usuário externo";
 }
