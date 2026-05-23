@@ -196,7 +196,7 @@ function TeamsLite() {
               <EmptyHint text="Nenhum chat encontrado." />
             ) : (
               chats.map((c) => {
-                const title = chatTitle(c, meId);
+                const title = chatTitle(c, meId, account.name);
                 const active = c.id === activeId;
                 return (
                   <button
@@ -209,7 +209,7 @@ function TeamsLite() {
                     <span className="line-clamp-1 font-medium">{title}</span>
                     <span className="text-[11px] text-muted-foreground">
                       {c.chatType === "group" ? "Grupo · " : ""}
-                      {formatDate(c.lastUpdatedDateTime)}
+                      {formatDate(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
                     </span>
                   </button>
                 );
