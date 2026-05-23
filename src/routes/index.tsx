@@ -527,8 +527,19 @@ function TeamsLite() {
           ) : (
             <>
               {headerTitle && (
-                <div className="border-b border-border bg-card px-6 py-2.5 text-sm font-medium">
-                  {headerTitle}
+                <div className="flex items-center gap-3 border-b border-border bg-card px-6 py-2.5 text-sm font-medium">
+                  {(() => {
+                    if (selection?.kind === "chat") {
+                      const c = chats.find((x) => x.id === selection.chatId);
+                      const isGroup = c?.chatType === "group" || c?.chatType === "meeting";
+                      const otherId = c && !isGroup
+                        ? (c.members ?? []).find((m) => m.userId && m.userId !== meId)?.userId ?? undefined
+                        : undefined;
+                      return <Avatar name={headerTitle} isGroup={isGroup} userId={otherId} cfg={config} size={32} />;
+                    }
+                    return <Avatar name={headerTitle} isGroup size={32} />;
+                  })()}
+                  <span>{headerTitle}</span>
                 </div>
               )}
               <div className="relative flex min-h-0 flex-1 flex-col">
