@@ -557,6 +557,52 @@ function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
   );
 }
 
+function PendingBubble({
+  p,
+  onRetry,
+  onDiscard,
+}: {
+  p: { text: string; status: "sending" | "error"; error?: string };
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  const isError = p.status === "error";
+  return (
+    <div className="flex justify-end">
+      <div
+        className={`max-w-[75%] rounded-2xl rounded-br-sm px-4 py-2 text-sm shadow-sm ${
+          isError
+            ? "border border-destructive/40 bg-destructive/10 text-foreground"
+            : "bg-primary/70 text-primary-foreground"
+        }`}
+      >
+        <div className="whitespace-pre-wrap break-words">{p.text}</div>
+        {isError ? (
+          <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+            <AlertCircle size={12} className="text-destructive" />
+            <span className="text-destructive">Falha ao enviar</span>
+            <button onClick={onRetry} className="ml-auto rounded px-2 py-0.5 font-medium underline hover:no-underline">
+              Reenviar
+            </button>
+            <button
+              onClick={onDiscard}
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              title="Descartar"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-primary-foreground/80">
+            <Loader2 size={10} className="animate-spin" />
+            <span>Enviando…</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function stripHtml(html: string) {
   if (typeof window === "undefined") return html.replace(/<[^>]*>/g, "");
   const div = document.createElement("div");
