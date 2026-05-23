@@ -19,6 +19,31 @@ async function graphFetch(cfg: TeamsConfig, path: string, init: RequestInit = {}
   return res.json();
 }
 
+// =========== User photos (cached object URLs) ===========
+
+const photoCache = new Map<string, Promise<string | null>>();
+
+export function getUserPhotoUrl(cfg: TeamsConfig, userId: string): Promise<string | null> {
+  if (!userId) return Promise.resolve(null);
+  const cached = photoCache.get(userId);
+  if (cached) return cached;
+  const p = (async () => {
+    try {
+      const token = await getAccessToken(cfg);
+      const res = await fetch(`${GRAPH}/users/${userId}/photo/$value`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  })();
+  photoCache.set(userId, p);
+  return p;
+}
+
 export type GraphChatMember = {
   displayName?: string | null;
   userId?: string | null;
