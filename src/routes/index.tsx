@@ -231,7 +231,7 @@ function TeamsLite() {
       await signOut(config);
       setAccount(null);
       setChats([]);
-      setTeams([]);
+      setChannelList([]);
       setMessages([]);
       setSelection(null);
     } catch (e) {
