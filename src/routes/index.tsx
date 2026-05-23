@@ -237,27 +237,53 @@ function TeamsLite() {
     }
   }
 
-  async function handleSend() {
-    if (!config || !selection || !draft.trim() || sending) return;
-    setSending(true);
-    const text = draft;
-    setDraft("");
+  async function doSend(p: Pending) {
+    if (!config) return;
+    const sel = selection;
+    if (!sel) return;
+    setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: "sending", error: undefined } : x)));
     try {
-      if (selection.kind === "chat") {
-        await sendMessage(config, selection.chatId, text);
-        const msgs = await listMessages(config, selection.chatId);
+      if (sel.kind === "chat") {
+        await sendMessage(config, sel.chatId, p.text);
+        const msgs = await listMessages(config, sel.chatId);
         setMessages(msgs);
       } else {
-        await sendChannelMessage(config, selection.teamId, selection.channelId, text);
-        const msgs = await listChannelMessages(config, selection.teamId, selection.channelId);
+        await sendChannelMessage(config, sel.teamId, sel.channelId, p.text);
+        const msgs = await listChannelMessages(config, sel.teamId, sel.channelId);
         setMessages(msgs);
       }
+      setPending((prev) => prev.filter((x) => x.id !== p.id));
     } catch (e) {
-      setError(String(e));
-      setDraft(text);
+      setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: "error", error: String(e) } : x)));
+    }
+  }
+
+  async function handleSend() {
+    if (!config || !selection || !draft.trim() || sending) return;
+    const text = draft.trim();
+    setDraft("");
+    setSending(true);
+    const p: Pending = {
+      id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      selKey: selection.kind === "chat" ? `c:${selection.chatId}` : `ch:${selection.teamId}:${selection.channelId}`,
+      text,
+      status: "sending",
+    };
+    setPending((prev) => [...prev, p]);
+    try {
+      await doSend(p);
     } finally {
       setSending(false);
     }
+  }
+
+  function retryPending(id: string) {
+    const p = pending.find((x) => x.id === id);
+    if (p) doSend(p);
+  }
+
+  function discardPending(id: string) {
+    setPending((prev) => prev.filter((x) => x.id !== id));
   }
 
   const headerTitle = useMemo(() => {
