@@ -360,10 +360,11 @@ function TeamsLite() {
                     >
                       <button
                         onClick={() => setSelection({ kind: "chat", chatId: c.id })}
-                        className="flex min-w-0 flex-1 flex-col items-start gap-1"
+                        className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
+                        title={title}
                       >
-                        <span className="line-clamp-1 font-medium">{title}</span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="line-clamp-1 w-full text-left font-medium">{title}</span>
+                        <span className="w-full text-left text-[11px] text-muted-foreground">
                           {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
                           {c.chatType === "group" ? " · Grupo" : ""}
                         </span>
@@ -375,7 +376,7 @@ function TeamsLite() {
                         }}
                         disabled={isBusy}
                         title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
-                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-1 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
                       >
                         {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                       </button>
