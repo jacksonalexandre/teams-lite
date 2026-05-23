@@ -221,10 +221,10 @@ function TeamsLite() {
   const meId = useMemo(() => account?.oid, [account]);
 
   async function toggleHide(chatId: string, currentlyHidden: boolean) {
-    if (!config || hidingId) return;
+    if (!config || hidingId || !account?.oid || !account?.tid) return;
     setHidingId(chatId);
     try {
-      await hideChat(config, chatId, !currentlyHidden);
+      await hideChat(config, chatId, !currentlyHidden, { id: account.oid, tenantId: account.tid });
       setChats((prev) =>
         prev.map((c) =>
           c.id === chatId
