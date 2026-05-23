@@ -92,35 +92,45 @@ function TeamsLite() {
       .finally(() => setLoadingChats(false));
   }, [config, account, mode]); // eslint-disable-line
 
-  // Load teams
+  // Load all channels across joined teams, sorted by last activity
   useEffect(() => {
     if (!config || !account || mode !== "channels") return;
-    setLoadingTeams(true);
-    listJoinedTeams(config)
-      .then((ts) => setTeams(ts))
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoadingTeams(false));
+    let cancelled = false;
+    setLoadingChannels(true);
+    (async () => {
+      try {
+        const ts = await listJoinedTeams(config);
+        const channelsPerTeam = await Promise.all(
+          ts.map((t) =>
+            listChannels(config, t.id)
+              .then((chs) => chs.map((channel) => ({ team: t, channel })))
+              .catch(() => [] as Array<{ team: GraphTeam; channel: GraphChannel }>),
+          ),
+        );
+        const flat = channelsPerTeam.flat();
+        const withDates = await Promise.all(
+          flat.map(async (item) => ({
+            ...item,
+            lastDate: await getChannelLastMessageDate(config, item.team.id, item.channel.id),
+          })),
+        );
+        withDates.sort((a, b) => {
+          const ad = a.lastDate ? new Date(a.lastDate).getTime() : 0;
+          const bd = b.lastDate ? new Date(b.lastDate).getTime() : 0;
+          return bd - ad;
+        });
+        if (!cancelled) setChannelList(withDates);
+      } catch (e) {
+        if (!cancelled) setError(String(e));
+      } finally {
+        if (!cancelled) setLoadingChannels(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [config, account, mode]);
 
-  async function toggleTeam(teamId: string) {
-    if (!config) return;
-    if (expandedTeam === teamId) {
-      setExpandedTeam(null);
-      return;
-    }
-    setExpandedTeam(teamId);
-    if (!channelsByTeam[teamId]) {
-      setLoadingChannels((p) => ({ ...p, [teamId]: true }));
-      try {
-        const chs = await listChannels(config, teamId);
-        setChannelsByTeam((p) => ({ ...p, [teamId]: chs }));
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoadingChannels((p) => ({ ...p, [teamId]: false }));
-      }
-    }
-  }
 
   // Load messages (chat or channel) + poll
   useEffect(() => {
