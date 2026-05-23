@@ -197,25 +197,35 @@ function TeamsLite() {
             ) : chats.length === 0 ? (
               <EmptyHint text="Nenhum chat encontrado." />
             ) : (
-              chats.map((c) => {
-                const title = chatTitle(c, meId, account.name);
-                const active = c.id === activeId;
-                return (
+              <>
+                {chats.length > visibleCount && (
                   <button
-                    key={c.id}
-                    onClick={() => setActiveId(c.id)}
-                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
-                      active ? "bg-muted" : "hover:bg-muted/60"
-                    }`}
+                    onClick={() => setVisibleCount((n) => n + 7)}
+                    className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
                   >
-                    <span className="line-clamp-1 font-medium">{title}</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
-                      {c.chatType === "group" ? " · Grupo" : ""}
-                    </span>
+                    Carregar mais ({chats.length - visibleCount} restantes)
                   </button>
-                );
-              })
+                )}
+                {chats.slice(0, visibleCount).map((c) => {
+                  const title = chatTitle(c, meId, account.name);
+                  const active = c.id === activeId;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveId(c.id)}
+                      className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                        active ? "bg-muted" : "hover:bg-muted/60"
+                      }`}
+                    >
+                      <span className="line-clamp-1 font-medium">{title}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
+                        {c.chatType === "group" ? " · Grupo" : ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </>
             )}
           </div>
         </aside>
