@@ -340,22 +340,6 @@ function TeamsLite() {
             </button>
           </div>
 
-          {mode === "chats" && account && (
-            <div className="flex items-center justify-between border-b border-border px-4 py-2">
-              <span className="text-[11px] text-muted-foreground">
-                {showHidden ? "Ocultos" : "Ativos"} ({filteredChats.length})
-              </span>
-              <button
-                onClick={() => {
-                  setShowHidden((v) => !v);
-                  setVisibleCount(7);
-                }}
-                className="text-[11px] font-medium text-primary hover:underline"
-              >
-                {showHidden ? "Ver ativos" : "Ver ocultos"}
-              </button>
-            </div>
-          )}
 
           <div className="flex-1 overflow-y-auto">
             {!account ? (
