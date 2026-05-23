@@ -40,7 +40,8 @@ export function getMsal(cfg: TeamsConfig) {
       auth: {
         clientId: cfg.clientId,
         authority: `https://login.microsoftonline.com/${cfg.tenantId || "common"}`,
-        redirectUri: window.location.origin,
+        redirectUri: `${window.location.origin}/auth-callback.html`,
+        postLogoutRedirectUri: window.location.origin,
       },
       cache: {
         cacheLocation: "localStorage",
