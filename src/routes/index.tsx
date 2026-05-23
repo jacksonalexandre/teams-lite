@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [account, setAccount] = useState<{ name?: string; username: string } | null>(null);
+  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string } | null>(null);
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<GraphMessage[]>([]);
