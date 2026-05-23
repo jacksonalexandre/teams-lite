@@ -506,7 +506,17 @@ function TeamsLite() {
                   <>
                     {messages.length > msgsVisibleCount && (
                       <button
-                        onClick={() => setMsgsVisibleCount((n) => n + 7)}
+                        onClick={() => {
+                          const el = scrollRef.current;
+                          const prevHeight = el?.scrollHeight ?? 0;
+                          const prevTop = el?.scrollTop ?? 0;
+                          setMsgsVisibleCount((n) => n + 7);
+                          requestAnimationFrame(() => {
+                            const el2 = scrollRef.current;
+                            if (!el2) return;
+                            el2.scrollTop = prevTop + (el2.scrollHeight - prevHeight);
+                          });
+                        }}
                         className="mx-auto block rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
                       >
                         Carregar mais ({messages.length - msgsVisibleCount} restantes)
