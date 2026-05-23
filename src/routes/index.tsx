@@ -512,9 +512,16 @@ function TeamsLite() {
                         Carregar mais ({messages.length - msgsVisibleCount} restantes)
                       </button>
                     )}
-                    {messages.slice(-msgsVisibleCount).map((m) => (
-                      <MessageBubble key={m.id} m={m} meName={account.name} />
-                    ))}
+                    {messages.slice(-msgsVisibleCount).map((m, i, arr) => {
+                      const prev = arr[i - 1];
+                      const showDate = !prev || toDateKey(m.createdDateTime) !== toDateKey(prev.createdDateTime);
+                      return (
+                        <div key={m.id} className="flex flex-col gap-3">
+                          {showDate && <DateSeparator iso={m.createdDateTime} />}
+                          <MessageBubble m={m} meName={account.name} />
+                        </div>
+                      );
+                    })}
                     {pending
                       .filter((p) => p.selKey === selKey)
                       .map((p) => (
@@ -649,6 +656,42 @@ function stripHtml(html: string) {
   const div = document.createElement("div");
   div.innerHTML = html;
   return div.textContent || div.innerText || "";
+}
+
+function toDateKey(iso: string) {
+  try {
+    return new Date(iso).toDateString();
+  } catch {
+    return "";
+  }
+}
+
+function DateSeparator({ iso }: { iso: string }) {
+  const label = (() => {
+    try {
+      const d = new Date(iso);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return "Hoje";
+      if (d.toDateString() === yesterday.toDateString()) return "Ontem";
+      return d.toLocaleDateString("pt-BR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return "";
+    }
+  })();
+  return (
+    <div className="flex items-center justify-center py-1">
+      <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+        {label}
+      </span>
+    </div>
+  );
 }
 
 function formatDateTime(iso: string) {
