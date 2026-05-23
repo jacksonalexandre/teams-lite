@@ -41,7 +41,7 @@ type Selection =
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string } | null>(null);
+  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string; tid?: string } | null>(null);
   const [mode, setMode] = useState<Mode>("chats");
 
   // Chats state
