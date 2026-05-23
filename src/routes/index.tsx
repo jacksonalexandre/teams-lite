@@ -20,6 +20,7 @@ import {
   listChannels,
   listChannelMessages,
   sendChannelMessage,
+  getChannelLastMessageDate,
   type GraphChat,
   type GraphMessage,
   type GraphTeam,
