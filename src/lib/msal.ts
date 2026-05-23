@@ -1,4 +1,8 @@
-import { PublicClientApplication, type Configuration, InteractionRequiredAuthError } from "@azure/msal-browser";
+import {
+  PublicClientApplication,
+  type Configuration,
+  InteractionRequiredAuthError,
+} from "@azure/msal-browser";
 
 const STORAGE_KEY = "teamslite.config";
 const POPUP_REDIRECT_PATH = "/auth-callback";
@@ -26,11 +30,7 @@ export function clearConfig() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export const GRAPH_SCOPES = [
-  "User.Read",
-  "Chat.ReadWrite",
-  "ChatMessage.Send",
-];
+export const GRAPH_SCOPES = ["User.Read", "Chat.ReadWrite", "ChatMessage.Send"];
 
 let pca: PublicClientApplication | null = null;
 let initialized = false;

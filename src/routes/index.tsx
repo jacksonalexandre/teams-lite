@@ -342,7 +342,8 @@ function SettingsModal({
 }) {
   const [clientId, setClientId] = useState(initial?.clientId ?? "");
   const [tenantId, setTenantId] = useState(initial?.tenantId ?? "common");
-  const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "";
+  const redirectUri =
+    typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "";
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4">
