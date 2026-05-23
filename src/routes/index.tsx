@@ -268,10 +268,11 @@ function TeamsLite() {
       const c = chats.find((x) => x.id === selection.chatId);
       return c ? chatTitle(c, meId, account?.name) : "";
     }
-    const team = teams.find((t) => t.id === selection.teamId);
-    const ch = channelsByTeam[selection.teamId]?.find((c) => c.id === selection.channelId);
-    return team && ch ? `${team.displayName} · ${ch.displayName}` : "";
-  }, [selection, chats, teams, channelsByTeam, meId, account]);
+    const item = channelList.find(
+      (x) => x.team.id === selection.teamId && x.channel.id === selection.channelId,
+    );
+    return item ? `${item.team.displayName} · ${item.channel.displayName}` : "";
+  }, [selection, chats, channelList, meId, account]);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
