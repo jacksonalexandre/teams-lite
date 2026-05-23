@@ -1,6 +1,7 @@
 import { PublicClientApplication, type Configuration, InteractionRequiredAuthError } from "@azure/msal-browser";
 
 const STORAGE_KEY = "teamslite.config";
+const POPUP_REDIRECT_PATH = "/auth-callback";
 
 export type TeamsConfig = {
   clientId: string;
@@ -40,7 +41,7 @@ export function getMsal(cfg: TeamsConfig) {
       auth: {
         clientId: cfg.clientId,
         authority: `https://login.microsoftonline.com/${cfg.tenantId || "common"}`,
-        redirectUri: `${window.location.origin}/auth-callback.html`,
+        redirectUri: `${window.location.origin}${POPUP_REDIRECT_PATH}`,
         postLogoutRedirectUri: window.location.origin,
       },
       cache: {
