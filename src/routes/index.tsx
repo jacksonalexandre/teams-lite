@@ -175,22 +175,34 @@ function TeamsLite() {
 
   const meId = useMemo(() => account?.oid, [account]);
 
-  function toggleArchive(chatId: string) {
-    setArchived((prev) => {
-      const next = new Set(prev);
-      if (next.has(chatId)) next.delete(chatId);
-      else next.add(chatId);
-      saveArchived(next);
-      return next;
-    });
-    if (selection?.kind === "chat" && selection.chatId === chatId) {
-      setSelection(null);
+  async function toggleHide(chatId: string, currentlyHidden: boolean) {
+    if (!config || hidingId) return;
+    setHidingId(chatId);
+    try {
+      await hideChat(config, chatId, !currentlyHidden);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === chatId
+            ? { ...c, viewpoint: { ...(c.viewpoint ?? {}), isHidden: !currentlyHidden } }
+            : c,
+        ),
+      );
+      if (selection?.kind === "chat" && selection.chatId === chatId) {
+        setSelection(null);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setHidingId(null);
     }
   }
 
   const filteredChats = useMemo(() => {
-    return chats.filter((c) => (showArchived ? archived.has(c.id) : !archived.has(c.id)));
-  }, [chats, archived, showArchived]);
+    return chats.filter((c) => {
+      const hidden = !!c.viewpoint?.isHidden;
+      return showHidden ? hidden : !hidden;
+    });
+  }, [chats, showHidden]);
 
   async function handleSignIn() {
     if (!config) return;
