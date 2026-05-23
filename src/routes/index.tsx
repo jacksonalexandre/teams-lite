@@ -345,52 +345,42 @@ function TeamsLite() {
               ) : filteredChats.length === 0 ? (
                 <EmptyHint text="Nenhum chat encontrado." />
               ) : (
-                <>
-                  {filteredChats.slice(0, visibleCount).map((c) => {
-                    const title = chatTitle(c, meId, account.name);
-                    const active = selection?.kind === "chat" && selection.chatId === c.id;
-                    const isHidden = !!c.viewpoint?.isHidden;
-                    const isBusy = hidingId === c.id;
-                    return (
-                      <div
-                        key={c.id}
-                        className={`group flex w-full items-start gap-2 border-b border-border px-3 py-3 text-left text-sm transition-colors ${
-                          active ? "bg-muted" : "hover:bg-muted/60"
-                        }`}
-                      >
-                        <button
-                          onClick={() => setSelection({ kind: "chat", chatId: c.id })}
-                          className="flex min-w-0 flex-1 flex-col items-start gap-0.5"
-                        >
-                          <span className="line-clamp-1 font-medium">{title}</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
-                            {c.chatType === "group" ? " · Grupo" : ""}
-                          </span>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleHide(c.id, isHidden);
-                          }}
-                          disabled={isBusy}
-                          title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
-                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
-                        >
-                          {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {filteredChats.length > visibleCount && (
-                    <button
-                      onClick={() => setVisibleCount((n) => n + 7)}
-                      className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                filteredChats.map((c) => {
+                  const title = chatTitle(c, meId, account.name);
+                  const active = selection?.kind === "chat" && selection.chatId === c.id;
+                  const isHidden = !!c.viewpoint?.isHidden;
+                  const isBusy = hidingId === c.id;
+                  return (
+                    <div
+                      key={c.id}
+                      className={`group flex w-full items-start gap-2 border-b border-border px-3 py-3 text-left text-sm transition-colors ${
+                        active ? "bg-muted" : "hover:bg-muted/60"
+                      }`}
                     >
-                      Carregar mais ({filteredChats.length - visibleCount} restantes)
-                    </button>
-                  )}
-                </>
+                      <button
+                        onClick={() => setSelection({ kind: "chat", chatId: c.id })}
+                        className="flex min-w-0 flex-1 flex-col items-start gap-1"
+                      >
+                        <span className="line-clamp-1 font-medium">{title}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatDateTime(c.lastMessagePreview?.createdDateTime ?? c.lastUpdatedDateTime)}
+                          {c.chatType === "group" ? " · Grupo" : ""}
+                        </span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleHide(c.id, isHidden);
+                        }}
+                        disabled={isBusy}
+                        title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-1 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
+                      >
+                        {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                      </button>
+                    </div>
+                  );
+                })
               )
             ) : loadingChannels ? (
               <EmptyHint text="Carregando canais…" />
