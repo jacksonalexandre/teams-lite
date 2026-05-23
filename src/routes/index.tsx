@@ -252,7 +252,8 @@ function TeamsLite() {
     setError(null);
     try {
       const acc = await signIn(config);
-      setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
+      const claims = (acc as any).idTokenClaims ?? {};
+      setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || (acc as any).tenantId });
     } catch (e) {
       setError(String(e));
     }
