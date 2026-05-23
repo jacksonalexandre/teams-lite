@@ -13,6 +13,7 @@ export type TeamsConfig = {
 
 export const GRAPH_SCOPES = [
   "User.Read",
+  "User.ReadBasic.All",
   "Chat.ReadWrite",
   "ChatMessage.Send",
   "Team.ReadBasic.All",

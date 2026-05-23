@@ -21,6 +21,7 @@ import {
   listChannelMessages,
   sendChannelMessage,
   getChannelLastMessageDate,
+  getUserPhotoUrl,
   type GraphChat,
   type GraphMessage,
   type GraphTeam,
@@ -424,6 +425,9 @@ function TeamsLite() {
                       ? `${previewAuthor.split(" ")[0]}: `
                       : "";
                   const isGroup = c.chatType === "group" || c.chatType === "meeting";
+                  const otherUserId = !isGroup
+                    ? (c.members ?? []).find((m) => m.userId && m.userId !== meId)?.userId ?? undefined
+                    : undefined;
                   return (
                     <div
                       key={c.id}
@@ -433,7 +437,7 @@ function TeamsLite() {
                       }`}
                       title={title}
                     >
-                      <Avatar name={title} isGroup={isGroup} />
+                      <Avatar name={title} isGroup={isGroup} userId={otherUserId} cfg={config} />
                       <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="truncate text-left font-semibold text-foreground" title={title}>
@@ -523,8 +527,19 @@ function TeamsLite() {
           ) : (
             <>
               {headerTitle && (
-                <div className="border-b border-border bg-card px-6 py-2.5 text-sm font-medium">
-                  {headerTitle}
+                <div className="flex items-center gap-3 border-b border-border bg-card px-6 py-2.5 text-sm font-medium">
+                  {(() => {
+                    if (selection?.kind === "chat") {
+                      const c = chats.find((x) => x.id === selection.chatId);
+                      const isGroup = c?.chatType === "group" || c?.chatType === "meeting";
+                      const otherId = c && !isGroup
+                        ? (c.members ?? []).find((m) => m.userId && m.userId !== meId)?.userId ?? undefined
+                        : undefined;
+                      return <Avatar name={headerTitle} isGroup={isGroup} userId={otherId} cfg={config} size={32} />;
+                    }
+                    return <Avatar name={headerTitle} isGroup size={32} />;
+                  })()}
+                  <span>{headerTitle}</span>
                 </div>
               )}
               <div className="relative flex min-h-0 flex-1 flex-col">
@@ -563,7 +578,7 @@ function TeamsLite() {
                       return (
                         <div key={m.id} className="flex flex-col gap-3">
                           {showDate && <DateSeparator iso={m.createdDateTime} />}
-                          <MessageBubble m={m} meName={account.name} />
+                          <MessageBubble m={m} meName={account.name} cfg={config} />
                         </div>
                       );
                     })}
@@ -626,13 +641,15 @@ function EmptyHint({ text }: { text: string }) {
   return <div className="px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>;
 }
 
-function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
+function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
   const text = m.body.contentType === "html" ? stripHtml(m.body.content) : m.body.content;
   if (!text.trim()) return null;
+  const fromUserId = m.from?.user?.id ?? undefined;
   return (
-    <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+      {!mine && <Avatar name={author} userId={fromUserId} cfg={cfg} size={28} />}
       <div
         className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
           mine
@@ -787,16 +804,60 @@ function colorFromName(name: string) {
   return `hsl(${hue} 55% 45%)`;
 }
 
-function Avatar({ name, isGroup }: { name: string; isGroup?: boolean }) {
+function useUserPhoto(cfg: TeamsConfig | null, userId?: string | null) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!cfg || !userId) {
+      setUrl(null);
+      return;
+    }
+    getUserPhotoUrl(cfg, userId).then((u) => {
+      if (!cancelled) setUrl(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cfg, userId]);
+  return url;
+}
+
+function Avatar({
+  name,
+  isGroup,
+  userId,
+  cfg,
+  size = 40,
+}: {
+  name: string;
+  isGroup?: boolean;
+  userId?: string;
+  cfg?: TeamsConfig | null;
+  size?: number;
+}) {
   const bg = colorFromName(name || "?");
+  const photo = useUserPhoto(cfg ?? null, isGroup ? null : userId);
+  const dim = { width: size, height: size };
+  const textSize = size <= 28 ? "text-[10px]" : "text-xs";
+  if (photo) {
+    return (
+      <img
+        src={photo}
+        alt=""
+        aria-hidden
+        style={dim}
+        className="shrink-0 rounded-full object-cover"
+      />
+    );
+  }
   return (
     <div
-      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
-      style={{ backgroundColor: bg }}
+      className={`grid shrink-0 place-items-center rounded-full font-semibold text-white ${textSize}`}
+      style={{ backgroundColor: bg, ...dim }}
       aria-hidden
     >
       {isGroup ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width={size * 0.45} height={size * 0.45} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
           <circle cx="8.5" cy="7" r="4" />
           <path d="M22 21v-2a4 4 0 0 0-3-3.87" />

@@ -1,30 +1,35 @@
-## Arquivos não usados no projeto
+# Carregar fotos dos usuários
 
-Após varrer todos os `import` em `src/` (exceto `routeTree.gen.ts`), encontrei o seguinte material morto:
+Hoje o `Avatar` em `src/routes/index.tsx` mostra apenas iniciais coloridas — nunca chegamos a buscar a foto real no Microsoft Graph. Para exibir as imagens corretamente faltam quatro coisas:
 
-### Arquivos a remover
+## 1. Escopo de permissão
+Em `src/lib/msal.ts`, adicionar `User.ReadBasic.All` aos `GRAPH_SCOPES`. Sem ele, só conseguimos a foto do próprio usuário (`/me/photo/$value`), não a dos outros membros do chat. Usuários existentes precisarão re-consentir (popup automático na próxima chamada).
 
-1. **`src/components/ui/aspect-ratio.tsx`** — nenhum import em lugar nenhum. É o único arquivo dentro de `src/components/`, então a pasta `src/components/ui/` (e `src/components/`) também fica vazia e pode ser removida.
-2. **`src/lib/utils.ts`** — exporta apenas `cn()`, que não é usado em nenhum lugar (varri `rg "\\bcn\\b" src` e `rg "from.*lib/utils" src` — zero resultados).
-3. **`src/hooks/`** — diretório já está vazio, pode ser removido.
+## 2. Helper para buscar a foto
+Em `src/lib/graph.ts`, criar `getUserPhotoUrl(cfg, userId)`:
+- Faz `GET /users/{userId}/photo/$value` com `Authorization: Bearer …` (não usa `graphFetch` porque a resposta é binária, não JSON).
+- Em sucesso, converte para `Blob` e retorna `URL.createObjectURL(blob)`.
+- Em 404 (usuário sem foto) ou erro, retorna `null`.
 
-### Dependências `package.json` não usadas
+## 3. Cache em memória
+Criar um `Map<userId, Promise<string | null>>` no módulo para deduplicar requisições — cada userId é buscado uma única vez por sessão. Sem cache, cada render do chat dispararia novas chamadas.
 
-Nada em `src/` importa delas, então podem sair com `bun remove`:
+## 4. Wiring no componente
+Em `src/routes/index.tsx`:
+- Estender `Avatar` para aceitar `userId?: string` e, quando presente, usar um hook (`useUserPhoto`) que consulta o cache e dispara o fetch.
+- Enquanto a foto carrega ou se falhar, mantém o fallback atual (iniciais + cor por nome).
+- Passar `userId` nos dois pontos de uso:
+  - Lista de chats (linha ~436): para `oneOnOne`, usar o `userId` do outro membro; manter ícone de grupo nos demais.
+  - Header da conversa selecionada (linha ~490 — header do chat aberto): mesmo critério.
+- Nas mensagens (`MessageBubble`), também mostrar avatar do remetente usando `message.from.user.id` — hoje o balão não tem avatar; este é o lugar onde a falta de foto é mais visível no Teams Web.
 
-- Todos os `@radix-ui/react-*` **exceto** os que estão sendo usados (atualmente nenhum — `@radix-ui/react-aspect-ratio` só era usado pelo arquivo morto acima): `accordion`, `alert-dialog`, `aspect-ratio`, `avatar`, `checkbox`, `collapsible`, `context-menu`, `dialog`, `dropdown-menu`, `hover-card`, `label`, `menubar`, `navigation-menu`, `popover`, `progress`, `radio-group`, `scroll-area`, `select`, `separator`, `slider`, `slot`, `switch`, `tabs`, `toggle`, `toggle-group`, `tooltip`.
-- `class-variance-authority`
-- `cmdk`
-- `input-otp`
-- `react-hook-form`
-- `sonner`
-- `zod`
-- `clsx` e `tailwind-merge` (só usados por `utils.ts`, que será removido)
+## Detalhes técnicos
 
-### O que **fica**
+- A resposta de `/photo/$value` é uma imagem JPEG. Object URLs são criadas uma vez e reutilizadas pelo cache; não precisamos revogar durante a sessão.
+- Tratar 404 silenciosamente (muitos usuários não têm foto definida) — não logar como erro.
+- O cache é por `userId`, então funciona tanto para membros de chats quanto para remetentes de mensagens em canais.
+- Não tocar em lógica de chats/mensagens/loader — apenas apresentação.
 
-`@azure/msal-browser`, `@tanstack/*`, `lucide-react`, `react`/`react-dom`, `tailwindcss` + `@tailwindcss/vite`, `tw-animate-css` (usado em `styles.css`), `vite-tsconfig-paths`, e todas as devDependencies.
-
-### Observação
-
-`src/components/ui/` é o destino padrão do shadcn — se você planeja adicionar componentes shadcn de novo em breve, talvez valha manter `utils.ts` (`cn`), `clsx` e `tailwind-merge`, já que praticamente todo componente shadcn depende deles. Me avise se prefere preservar esses três; nesse caso removo só o resto.
+## Fora de escopo
+- Avatar composto (mosaico) para grupos — mantém o ícone de grupo atual.
+- Persistência do cache entre reloads (IndexedDB) — só memória por enquanto.
