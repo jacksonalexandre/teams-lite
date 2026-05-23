@@ -348,7 +348,7 @@ function TeamsLite() {
               loadingChats ? (
                 <EmptyHint text="Carregando…" />
               ) : filteredChats.length === 0 ? (
-                <EmptyHint text={showHidden ? "Nenhum chat oculto." : "Nenhum chat encontrado."} />
+                <EmptyHint text="Nenhum chat encontrado." />
               ) : (
                 <>
                   {filteredChats.slice(0, visibleCount).map((c) => {
