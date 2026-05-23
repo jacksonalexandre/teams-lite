@@ -413,54 +413,33 @@ function TeamsLite() {
                   )}
                 </>
               )
-            ) : loadingTeams ? (
-              <EmptyHint text="Carregando equipes…" />
-            ) : teams.length === 0 ? (
-              <EmptyHint text="Nenhuma equipe encontrada." />
+            ) : loadingChannels ? (
+              <EmptyHint text="Carregando canais…" />
+            ) : channelList.length === 0 ? (
+              <EmptyHint text="Nenhum canal encontrado." />
             ) : (
-              teams.map((t) => {
-                const open = expandedTeam === t.id;
-                const chs = channelsByTeam[t.id];
+              channelList.map(({ team, channel, lastDate }) => {
+                const active =
+                  selection?.kind === "channel" &&
+                  selection.teamId === team.id &&
+                  selection.channelId === channel.id;
                 return (
-                  <div key={t.id} className="border-b border-border">
-                    <button
-                      onClick={() => toggleTeam(t.id)}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium hover:bg-muted/60"
-                    >
-                      <span className="line-clamp-1">{t.displayName}</span>
-                      <span className="text-xs text-muted-foreground">{open ? "▾" : "▸"}</span>
-                    </button>
-                    {open && (
-                      <div className="bg-background/40">
-                        {loadingChannels[t.id] ? (
-                          <EmptyHint text="Carregando canais…" />
-                        ) : chs && chs.length > 0 ? (
-                          chs.map((ch) => {
-                            const active =
-                              selection?.kind === "channel" &&
-                              selection.teamId === t.id &&
-                              selection.channelId === ch.id;
-                            return (
-                              <button
-                                key={ch.id}
-                                onClick={() =>
-                                  setSelection({ kind: "channel", teamId: t.id, channelId: ch.id })
-                                }
-                                className={`flex w-full items-center gap-2 px-6 py-2 text-left text-sm transition-colors ${
-                                  active ? "bg-muted" : "hover:bg-muted/60"
-                                }`}
-                              >
-                                <span className="text-muted-foreground">#</span>
-                                <span className="line-clamp-1">{ch.displayName}</span>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <EmptyHint text="Sem canais." />
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    key={`${team.id}:${channel.id}`}
+                    onClick={() =>
+                      setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })
+                    }
+                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                      active ? "bg-muted" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className="line-clamp-1 font-medium">
+                      <span className="text-muted-foreground">#</span> {channel.displayName}
+                    </span>
+                    <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                      {lastDate ? formatDateTime(lastDate) : "Sem mensagens"} · {team.displayName}
+                    </span>
+                  </button>
                 );
               })
             )}
