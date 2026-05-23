@@ -168,20 +168,51 @@ function TeamsLite() {
       : `ch:${selection.teamId}:${selection.channelId}`
     : null;
 
+  const [atBottom, setAtBottom] = useState(true);
+  const [hasNewBelow, setHasNewBelow] = useState(false);
+
   useEffect(() => {
     setMsgsVisibleCount(7);
+    setHasNewBelow(false);
+    setAtBottom(true);
+  }, [selKey]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      setAtBottom(near);
+      if (near) setHasNewBelow(false);
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
   }, [selKey]);
 
   useEffect(() => {
     const lastId = messages[messages.length - 1]?.id ?? null;
     const selChanged = prevSelKeyRef.current !== selKey;
     const newMessage = prevLastMsgIdRef.current !== lastId;
-    if (selChanged || newMessage) {
+    if (selChanged) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    } else if (newMessage) {
+      if (atBottom) {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      } else if (prevLastMsgIdRef.current !== null) {
+        setHasNewBelow(true);
+      }
     }
     prevSelKeyRef.current = selKey;
     prevLastMsgIdRef.current = lastId;
-  }, [messages, selKey]);
+  }, [messages, selKey, atBottom]);
+
+  function scrollToBottom() {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setHasNewBelow(false);
+  }
+
 
   const meId = useMemo(() => account?.oid, [account]);
 
