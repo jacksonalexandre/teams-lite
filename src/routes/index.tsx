@@ -21,6 +21,7 @@ import {
   listChannelMessages,
   sendChannelMessage,
   getChannelLastMessageDate,
+  getUserPhotoUrl,
   type GraphChat,
   type GraphMessage,
   type GraphTeam,
