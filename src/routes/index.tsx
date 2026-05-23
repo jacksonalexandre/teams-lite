@@ -535,9 +535,10 @@ function TeamsLite() {
                   <EmptyHint text="Sem mensagens ainda." />
                 ) : (
                   <>
-                    {messages.length > msgsVisibleCount && (
+                    {messages.length > 0 && (
                       <button
                         onClick={() => {
+                          if (messages.length <= msgsVisibleCount) return;
                           const el = scrollRef.current;
                           const prevHeight = el?.scrollHeight ?? 0;
                           const prevTop = el?.scrollTop ?? 0;
@@ -548,9 +549,12 @@ function TeamsLite() {
                             el2.scrollTop = prevTop + (el2.scrollHeight - prevHeight);
                           });
                         }}
-                        className="mx-auto block rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                        disabled={messages.length <= msgsVisibleCount}
+                        className="mx-auto block rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        Carregar mais ({messages.length - msgsVisibleCount} restantes)
+                        {messages.length > msgsVisibleCount
+                          ? `Carregar mais (${messages.length - msgsVisibleCount} restantes)`
+                          : "Todas as mensagens carregadas"}
                       </button>
                     )}
                     {messages.slice(-msgsVisibleCount).map((m, i, arr) => {
