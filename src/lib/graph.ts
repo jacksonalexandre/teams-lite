@@ -83,7 +83,12 @@ export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
   return data.value as GraphChat[];
 }
 
-export async function hideChat(cfg: TeamsConfig, chatId: string, hide: boolean) {
+export async function hideChat(
+  cfg: TeamsConfig,
+  chatId: string,
+  hide: boolean,
+  user: { id: string; tenantId: string },
+) {
   const token = await getAccessToken(cfg);
   const res = await fetch(`${GRAPH}/chats/${chatId}/hideForUser`, {
     method: "POST",
@@ -92,7 +97,7 @@ export async function hideChat(cfg: TeamsConfig, chatId: string, hide: boolean) 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      user: { "@odata.id": `https://graph.microsoft.com/v1.0/me` },
+      user: { id: user.id, tenantId: user.tenantId },
       hideForUser: hide,
     }),
   });

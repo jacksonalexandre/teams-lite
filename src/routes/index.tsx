@@ -41,7 +41,7 @@ type Selection =
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string } | null>(null);
+  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string; tid?: string } | null>(null);
   const [mode, setMode] = useState<Mode>("chats");
 
   // Chats state
@@ -76,7 +76,10 @@ function TeamsLite() {
         return ensureInit(cfg).then(() => getCurrentAccount(cfg));
       })
       .then((acc) => {
-        if (acc) setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
+        if (acc) {
+          const claims = (acc as any).idTokenClaims ?? {};
+          setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || acc.tenantId });
+        }
       })
       .catch((e) => setError(String(e)));
   }, []); // eslint-disable-line
@@ -218,10 +221,10 @@ function TeamsLite() {
   const meId = useMemo(() => account?.oid, [account]);
 
   async function toggleHide(chatId: string, currentlyHidden: boolean) {
-    if (!config || hidingId) return;
+    if (!config || hidingId || !account?.oid || !account?.tid) return;
     setHidingId(chatId);
     try {
-      await hideChat(config, chatId, !currentlyHidden);
+      await hideChat(config, chatId, !currentlyHidden, { id: account.oid, tenantId: account.tid });
       setChats((prev) =>
         prev.map((c) =>
           c.id === chatId
@@ -249,7 +252,8 @@ function TeamsLite() {
     setError(null);
     try {
       const acc = await signIn(config);
-      setAccount({ name: acc.name, username: acc.username, oid: (acc as any).idTokenClaims?.oid || acc.localAccountId });
+      const claims = (acc as any).idTokenClaims ?? {};
+      setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || (acc as any).tenantId });
     } catch (e) {
       setError(String(e));
     }
