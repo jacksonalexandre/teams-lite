@@ -72,14 +72,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Teams Lite — Chat leve via Microsoft Graph" },
+      { name: "description", content: "Cliente minimalista para Microsoft Teams Chats, frontend puro com Graph API." },
+      { name: "author", content: "Teams Lite" },
+      { property: "og:title", content: "Teams Lite" },
+      { property: "og:description", content: "Cliente minimalista para Microsoft Teams Chats." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

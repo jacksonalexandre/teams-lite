@@ -1,0 +1,69 @@
+import { getAccessToken, type TeamsConfig } from "./msal";
+
+const GRAPH = "https://graph.microsoft.com/v1.0";
+
+async function graphFetch(cfg: TeamsConfig, path: string, init: RequestInit = {}) {
+  const token = await getAccessToken(cfg);
+  const res = await fetch(`${GRAPH}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Graph ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+export type GraphChat = {
+  id: string;
+  topic: string | null;
+  chatType: "oneOnOne" | "group" | "meeting" | string;
+  lastUpdatedDateTime: string;
+  members?: Array<{ displayName?: string; userId?: string }>;
+};
+
+export type GraphMessage = {
+  id: string;
+  createdDateTime: string;
+  from?: {
+    user?: { displayName?: string; id?: string };
+  } | null;
+  body: { contentType: "html" | "text"; content: string };
+};
+
+export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
+  const data = await graphFetch(
+    cfg,
+    "/me/chats?$expand=members&$orderby=lastMessagePreview/createdDateTime desc&$top=50",
+  );
+  return data.value as GraphChat[];
+}
+
+export async function listMessages(cfg: TeamsConfig, chatId: string): Promise<GraphMessage[]> {
+  const data = await graphFetch(cfg, `/me/chats/${chatId}/messages?$top=50`);
+  // Graph returns newest first; reverse for chronological display
+  return (data.value as GraphMessage[]).slice().reverse();
+}
+
+export async function sendMessage(cfg: TeamsConfig, chatId: string, text: string) {
+  return graphFetch(cfg, `/me/chats/${chatId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      body: { contentType: "text", content: text },
+    }),
+  });
+}
+
+export function chatTitle(chat: GraphChat, meId?: string): string {
+  if (chat.topic) return chat.topic;
+  const others = (chat.members ?? []).filter((m) => m.userId !== meId);
+  const names = others.map((m) => m.displayName).filter(Boolean) as string[];
+  if (names.length === 0) return "(sem título)";
+  if (names.length <= 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}

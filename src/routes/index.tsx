@@ -1,26 +1,437 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  loadConfig,
+  saveConfig,
+  clearConfig,
+  signIn,
+  signOut,
+  ensureInit,
+  getCurrentAccount,
+  type TeamsConfig,
+} from "@/lib/msal";
+import {
+  listChats,
+  listMessages,
+  sendMessage,
+  chatTitle,
+  type GraphChat,
+  type GraphMessage,
+} from "@/lib/graph";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: TeamsLite,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
+function TeamsLite() {
+  const [config, setConfig] = useState<TeamsConfig | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [account, setAccount] = useState<{ name?: string; username: string } | null>(null);
+  const [chats, setChats] = useState<GraphChat[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<GraphMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [loadingChats, setLoadingChats] = useState(false);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Boot
+  useEffect(() => {
+    const cfg = loadConfig();
+    setConfig(cfg);
+    if (!cfg) {
+      setShowSettings(true);
+      return;
+    }
+    ensureInit(cfg)
+      .then(() => getCurrentAccount(cfg))
+      .then((acc) => {
+        if (acc) setAccount({ name: acc.name, username: acc.username });
+      })
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  // Load chats when signed in
+  useEffect(() => {
+    if (!config || !account) return;
+    setLoadingChats(true);
+    listChats(config)
+      .then((cs) => {
+        setChats(cs);
+        if (cs[0] && !activeId) setActiveId(cs[0].id);
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoadingChats(false));
+  }, [config, account]); // eslint-disable-line
+
+  // Load messages + poll
+  useEffect(() => {
+    if (!config || !activeId) return;
+    let cancelled = false;
+    const load = async (showLoader: boolean) => {
+      if (showLoader) setLoadingMsgs(true);
+      try {
+        const msgs = await listMessages(config, activeId);
+        if (!cancelled) setMessages(msgs);
+      } catch (e) {
+        if (!cancelled) setError(String(e));
+      } finally {
+        if (!cancelled && showLoader) setLoadingMsgs(false);
+      }
+    };
+    load(true);
+    const t = setInterval(() => load(false), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [config, activeId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages]);
+
+  const meId = useMemo(() => {
+    // username is upn/email; not the AAD object id, but we use it for member filtering fallback
+    return account?.username;
+  }, [account]);
+
+  async function handleSignIn() {
+    if (!config) return;
+    setError(null);
+    try {
+      const acc = await signIn(config);
+      setAccount({ name: acc.name, username: acc.username });
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleSignOut() {
+    if (!config) return;
+    try {
+      await signOut(config);
+      setAccount(null);
+      setChats([]);
+      setMessages([]);
+      setActiveId(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleSend() {
+    if (!config || !activeId || !draft.trim() || sending) return;
+    setSending(true);
+    const text = draft;
+    setDraft("");
+    try {
+      await sendMessage(config, activeId, text);
+      const msgs = await listMessages(config, activeId);
+      setMessages(msgs);
+    } catch (e) {
+      setError(String(e));
+      setDraft(text);
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <header className="flex items-center justify-between border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2">
+          <div className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground text-sm font-semibold">
+            T
+          </div>
+          <h1 className="text-base font-semibold tracking-tight">Teams Lite</h1>
+          <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            chats
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          {account ? (
+            <>
+              <span className="text-muted-foreground hidden sm:inline">{account.name ?? account.username}</span>
+              <button
+                onClick={handleSignOut}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                Sair
+              </button>
+            </>
+          ) : (
+            config && (
+              <button
+                onClick={handleSignIn}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                Entrar com Microsoft
+              </button>
+            )
+          )}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            Config
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="border-b border-destructive/30 bg-destructive/10 px-5 py-2 text-xs text-destructive">
+          <div className="flex items-start justify-between gap-3">
+            <pre className="whitespace-pre-wrap break-all font-mono">{error}</pre>
+            <button onClick={() => setError(null)} className="shrink-0 underline">
+              fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
+        {/* Sidebar */}
+        <aside className="flex w-72 flex-col border-r border-border bg-card">
+          <div className="border-b border-border px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Conversas
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {!account ? (
+              <EmptyHint text="Faça login para ver seus chats." />
+            ) : loadingChats ? (
+              <EmptyHint text="Carregando…" />
+            ) : chats.length === 0 ? (
+              <EmptyHint text="Nenhum chat encontrado." />
+            ) : (
+              chats.map((c) => {
+                const title = chatTitle(c, meId);
+                const active = c.id === activeId;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveId(c.id)}
+                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                      active ? "bg-muted" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className="line-clamp-1 font-medium">{title}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {c.chatType === "oneOnOne" ? "1:1" : c.chatType === "group" ? "Grupo" : c.chatType}
+                      {" · "}
+                      {formatDate(c.lastUpdatedDateTime)}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </aside>
+
+        {/* Main */}
+        <main className="flex min-w-0 flex-1 flex-col">
+          {!activeId || !account ? (
+            <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
+              {account ? "Selecione uma conversa" : "Não autenticado"}
+            </div>
+          ) : (
+            <>
+              <div
+                ref={scrollRef}
+                className="flex-1 space-y-3 overflow-y-auto px-6 py-5"
+              >
+                {loadingMsgs && messages.length === 0 ? (
+                  <EmptyHint text="Carregando mensagens…" />
+                ) : messages.length === 0 ? (
+                  <EmptyHint text="Sem mensagens ainda." />
+                ) : (
+                  messages.map((m) => <MessageBubble key={m.id} m={m} meName={account.name} />)
+                )}
+              </div>
+              <div className="border-t border-border bg-card px-4 py-3">
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Escreva uma mensagem… (Enter envia, Shift+Enter quebra linha)"
+                    rows={1}
+                    className="max-h-40 min-h-[40px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!draft.trim() || sending}
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    {sending ? "…" : "Enviar"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+
+      {showSettings && (
+        <SettingsModal
+          initial={config}
+          onClose={() => setShowSettings(false)}
+          onSave={(c) => {
+            saveConfig(c);
+            setConfig(c);
+            setShowSettings(false);
+            // Reload to re-init MSAL with new config cleanly
+            window.location.reload();
+          }}
+          onReset={() => {
+            clearConfig();
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function Index() {
-  return <PlaceholderIndex />;
+function EmptyHint({ text }: { text: string }) {
+  return <div className="px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>;
+}
+
+function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
+  const author = m.from?.user?.displayName ?? "Sistema";
+  const mine = !!meName && author === meName;
+  const text =
+    m.body.contentType === "html"
+      ? stripHtml(m.body.content)
+      : m.body.content;
+  if (!text.trim()) return null;
+  return (
+    <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+        mine
+          ? "bg-primary text-primary-foreground rounded-br-sm"
+          : "bg-card text-card-foreground border border-border rounded-bl-sm"
+      }`}>
+        {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
+        <div className="whitespace-pre-wrap break-words">{text}</div>
+        <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          {formatTime(m.createdDateTime)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({
+  initial,
+  onClose,
+  onSave,
+  onReset,
+}: {
+  initial: TeamsConfig | null;
+  onClose: () => void;
+  onSave: (c: TeamsConfig) => void;
+  onReset: () => void;
+}) {
+  const [clientId, setClientId] = useState(initial?.clientId ?? "");
+  const [tenantId, setTenantId] = useState(initial?.tenantId ?? "common");
+  const redirectUri = typeof window !== "undefined" ? window.location.origin : "";
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl">
+        <h2 className="text-lg font-semibold">Configuração Azure AD</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Registre um app SPA no Azure AD e cole os IDs aqui. Adicione este URL como Redirect URI (tipo SPA):
+        </p>
+        <code className="mt-2 block break-all rounded-md bg-muted px-3 py-2 text-xs">{redirectUri}</code>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Permissões delegadas necessárias: <code>User.Read</code>, <code>Chat.ReadWrite</code>, <code>ChatMessage.Send</code>.
+        </p>
+
+        <div className="mt-5 space-y-3">
+          <Field label="Client ID (Application ID)">
+            <input
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value.trim())}
+              placeholder="00000000-0000-0000-0000-000000000000"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            />
+          </Field>
+          <Field label="Tenant ID">
+            <input
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value.trim())}
+              placeholder="common, organizations ou GUID do tenant"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            />
+          </Field>
+        </div>
+
+        <div className="mt-6 flex items-center justify-between">
+          <button onClick={onReset} className="text-xs text-muted-foreground underline">
+            Limpar configuração
+          </button>
+          <div className="flex gap-2">
+            {initial && (
+              <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
+                Cancelar
+              </button>
+            )}
+            <button
+              onClick={() => clientId && onSave({ clientId, tenantId: tenantId || "common" })}
+              disabled={!clientId}
+              className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function stripHtml(html: string) {
+  if (typeof window === "undefined") return html.replace(/<[^>]*>/g, "");
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || div.innerText || "";
+}
+
+function formatTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+function formatDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) {
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
 }
