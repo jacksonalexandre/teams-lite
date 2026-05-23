@@ -491,10 +491,10 @@ function TeamsLite() {
                               toggleHide(c.id, isHidden);
                             }}
                             disabled={isBusy}
-                            title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
+                            title={isHidden ? "Mostrar no Teams" : "Ocultar no Teams"}
                             className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
                           >
-                            {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                            {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
                           </button>
                         </div>
                       </div>
