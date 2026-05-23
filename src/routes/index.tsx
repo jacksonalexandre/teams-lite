@@ -528,6 +528,15 @@ function TeamsLite() {
                   </>
                 )}
               </div>
+                {hasNewBelow && !atBottom && (
+                  <button
+                    onClick={scrollToBottom}
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-md hover:bg-muted"
+                  >
+                    ↓ Novas mensagens
+                  </button>
+                )}
+              </div>
               <div className="border-t border-border bg-card px-4 py-3">
                 <div className="flex items-end gap-2">
                   <textarea
