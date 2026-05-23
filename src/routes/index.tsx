@@ -375,7 +375,7 @@ function TeamsLite() {
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar */}
-        <aside className="flex w-72 flex-col border-r border-border bg-card">
+        <aside className="flex w-80 flex-col border-r border-border bg-card">
           <div className="flex border-b border-border">
             <button
               onClick={() => setMode("chats")}
