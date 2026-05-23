@@ -400,14 +400,15 @@ function TeamsLite() {
                     onClick={() =>
                       setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })
                     }
-                    className={`flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
+                    title={`${team.displayName} · #${channel.displayName}`}
+                    className={`flex w-full min-w-0 flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left text-sm transition-colors ${
                       active ? "bg-muted" : "hover:bg-muted/60"
                     }`}
                   >
-                    <span className="line-clamp-1 font-medium">
+                    <span className="line-clamp-1 w-full text-left font-medium">
                       <span className="text-muted-foreground">#</span> {channel.displayName}
                     </span>
-                    <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                    <span className="line-clamp-1 w-full text-left text-[11px] text-muted-foreground">
                       {lastDate ? formatDateTime(lastDate) : "Sem mensagens"} · {team.displayName}
                     </span>
                   </button>
