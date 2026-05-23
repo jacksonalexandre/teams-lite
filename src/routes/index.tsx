@@ -84,16 +84,36 @@ function TeamsLite() {
       .catch((e) => setError(String(e)));
   }, []); // eslint-disable-line
 
-  // Load chats
+  // Load chats + poll (paused when tab is hidden)
   useEffect(() => {
     if (!config || !account || mode !== "chats") return;
-    setLoadingChats(true);
-    listChats(config)
-      .then((cs) => {
-        setChats(cs);
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoadingChats(false));
+    let cancelled = false;
+    const load = async (showLoader: boolean) => {
+      if (showLoader) setLoadingChats(true);
+      try {
+        const cs = await listChats(config);
+        if (!cancelled) setChats(cs);
+      } catch (e) {
+        if (!cancelled && showLoader) setError(String(e));
+      } finally {
+        if (!cancelled && showLoader) setLoadingChats(false);
+      }
+    };
+    load(true);
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      load(false);
+    };
+    const interval = setInterval(tick, 15000);
+    const onVisible = () => {
+      if (typeof document !== "undefined" && !document.hidden) load(false);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [config, account, mode]); // eslint-disable-line
 
   // Load all channels across joined teams, sorted by last activity
