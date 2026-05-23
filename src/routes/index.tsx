@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Archive, ArchiveRestore, Loader2, AlertCircle, X } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, X } from "lucide-react";
 import {
   signIn,
   signOut,
