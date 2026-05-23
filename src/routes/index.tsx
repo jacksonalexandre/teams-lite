@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { Archive, ArchiveRestore } from "lucide-react";
 import {
   signIn,
   signOut,
@@ -14,6 +15,7 @@ import {
   listMessages,
   sendMessage,
   chatTitle,
+  hideChat,
   listJoinedTeams,
   listChannels,
   listChannelMessages,
@@ -34,24 +36,6 @@ type Selection =
   | { kind: "channel"; teamId: string; channelId: string }
   | null;
 
-const ARCHIVE_KEY = "teamslite.archivedChats";
-
-function loadArchived(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem(ARCHIVE_KEY);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveArchived(s: Set<string>) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ARCHIVE_KEY, JSON.stringify([...s]));
-}
-
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
@@ -62,8 +46,8 @@ function TeamsLite() {
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [visibleCount, setVisibleCount] = useState(7);
-  const [archived, setArchived] = useState<Set<string>>(() => loadArchived());
-  const [showArchived, setShowArchived] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [hidingId, setHidingId] = useState<string | null>(null);
 
   // Channels state
   const [teams, setTeams] = useState<GraphTeam[]>([]);
@@ -191,22 +175,34 @@ function TeamsLite() {
 
   const meId = useMemo(() => account?.oid, [account]);
 
-  function toggleArchive(chatId: string) {
-    setArchived((prev) => {
-      const next = new Set(prev);
-      if (next.has(chatId)) next.delete(chatId);
-      else next.add(chatId);
-      saveArchived(next);
-      return next;
-    });
-    if (selection?.kind === "chat" && selection.chatId === chatId) {
-      setSelection(null);
+  async function toggleHide(chatId: string, currentlyHidden: boolean) {
+    if (!config || hidingId) return;
+    setHidingId(chatId);
+    try {
+      await hideChat(config, chatId, !currentlyHidden);
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === chatId
+            ? { ...c, viewpoint: { ...(c.viewpoint ?? {}), isHidden: !currentlyHidden } }
+            : c,
+        ),
+      );
+      if (selection?.kind === "chat" && selection.chatId === chatId) {
+        setSelection(null);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setHidingId(null);
     }
   }
 
   const filteredChats = useMemo(() => {
-    return chats.filter((c) => (showArchived ? archived.has(c.id) : !archived.has(c.id)));
-  }, [chats, archived, showArchived]);
+    return chats.filter((c) => {
+      const hidden = !!c.viewpoint?.isHidden;
+      return showHidden ? hidden : !hidden;
+    });
+  }, [chats, showHidden]);
 
   async function handleSignIn() {
     if (!config) return;
@@ -336,16 +332,16 @@ function TeamsLite() {
           {mode === "chats" && account && (
             <div className="flex items-center justify-between border-b border-border px-4 py-2">
               <span className="text-[11px] text-muted-foreground">
-                {showArchived ? "Arquivados" : "Ativos"} ({filteredChats.length})
+                {showHidden ? "Ocultos" : "Ativos"} ({filteredChats.length})
               </span>
               <button
                 onClick={() => {
-                  setShowArchived((v) => !v);
+                  setShowHidden((v) => !v);
                   setVisibleCount(7);
                 }}
                 className="text-[11px] font-medium text-primary hover:underline"
               >
-                {showArchived ? "Ver ativos" : `Ver arquivados (${archived.size})`}
+                {showHidden ? "Ver ativos" : "Ver ocultos"}
               </button>
             </div>
           )}
@@ -357,13 +353,14 @@ function TeamsLite() {
               loadingChats ? (
                 <EmptyHint text="Carregando…" />
               ) : filteredChats.length === 0 ? (
-                <EmptyHint text={showArchived ? "Nenhum chat arquivado." : "Nenhum chat encontrado."} />
+                <EmptyHint text={showHidden ? "Nenhum chat oculto." : "Nenhum chat encontrado."} />
               ) : (
                 <>
                   {filteredChats.slice(0, visibleCount).map((c) => {
                     const title = chatTitle(c, meId, account.name);
                     const active = selection?.kind === "chat" && selection.chatId === c.id;
-                    const isArch = archived.has(c.id);
+                    const isHidden = !!c.viewpoint?.isHidden;
+                    const isBusy = hidingId === c.id;
                     return (
                       <div
                         key={c.id}
@@ -384,12 +381,13 @@ function TeamsLite() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleArchive(c.id);
+                            toggleHide(c.id, isHidden);
                           }}
-                          title={isArch ? "Desarquivar" : "Arquivar"}
-                          className="opacity-0 group-hover:opacity-100 shrink-0 rounded px-1.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-background hover:text-foreground transition-opacity"
+                          disabled={isBusy}
+                          title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
                         >
-                          {isArch ? "↩" : "📁"}
+                          {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                         </button>
                       </div>
                     );
