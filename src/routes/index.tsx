@@ -35,7 +35,10 @@ function TeamsLite() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(7);
+  const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevActiveIdRef = useRef<string | null>(null);
+  const prevLastMsgIdRef = useRef<string | null>(null);
 
   // Boot: load config from server then try existing account
   useEffect(() => {
@@ -88,8 +91,19 @@ function TeamsLite() {
   }, [config, activeId]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
+    setMsgsVisibleCount(7);
+  }, [activeId]);
+
+  useEffect(() => {
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const chatChanged = prevActiveIdRef.current !== activeId;
+    const newMessage = prevLastMsgIdRef.current !== lastId;
+    if (chatChanged || newMessage) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+    prevActiveIdRef.current = activeId;
+    prevLastMsgIdRef.current = lastId;
+  }, [messages, activeId]);
 
   const meId = useMemo(() => {
     return account?.oid;
@@ -198,14 +212,6 @@ function TeamsLite() {
               <EmptyHint text="Nenhum chat encontrado." />
             ) : (
               <>
-                {chats.length > visibleCount && (
-                  <button
-                    onClick={() => setVisibleCount((n) => n + 7)}
-                    className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-                  >
-                    Carregar mais ({chats.length - visibleCount} restantes)
-                  </button>
-                )}
                 {chats.slice(0, visibleCount).map((c) => {
                   const title = chatTitle(c, meId, account.name);
                   const active = c.id === activeId;
@@ -225,6 +231,14 @@ function TeamsLite() {
                     </button>
                   );
                 })}
+                {chats.length > visibleCount && (
+                  <button
+                    onClick={() => setVisibleCount((n) => n + 7)}
+                    className="flex w-full items-center justify-center border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    Carregar mais ({chats.length - visibleCount} restantes)
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -247,7 +261,19 @@ function TeamsLite() {
                 ) : messages.length === 0 ? (
                   <EmptyHint text="Sem mensagens ainda." />
                 ) : (
-                  messages.map((m) => <MessageBubble key={m.id} m={m} meName={account.name} />)
+                  <>
+                    {messages.length > msgsVisibleCount && (
+                      <button
+                        onClick={() => setMsgsVisibleCount((n) => n + 7)}
+                        className="mx-auto block rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Carregar mais ({messages.length - msgsVisibleCount} restantes)
+                      </button>
+                    )}
+                    {messages.slice(-msgsVisibleCount).map((m) => (
+                      <MessageBubble key={m.id} m={m} meName={account.name} />
+                    ))}
+                  </>
                 )}
               </div>
               <div className="border-t border-border bg-card px-4 py-3">
