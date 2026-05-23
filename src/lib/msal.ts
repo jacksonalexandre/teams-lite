@@ -4,31 +4,12 @@ import {
   InteractionRequiredAuthError,
 } from "@azure/msal-browser";
 
-const STORAGE_KEY = "teamslite.config";
 const POPUP_REDIRECT_PATH = "/auth-callback";
 
 export type TeamsConfig = {
   clientId: string;
   tenantId: string; // "common" | "organizations" | tenant GUID
 };
-
-export function loadConfig(): TeamsConfig | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as TeamsConfig) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveConfig(cfg: TeamsConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-}
-
-export function clearConfig() {
-  localStorage.removeItem(STORAGE_KEY);
-}
 
 export const GRAPH_SCOPES = ["User.Read", "Chat.ReadWrite", "ChatMessage.Send"];
 
