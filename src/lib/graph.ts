@@ -153,10 +153,10 @@ export async function getChannelLastMessageDate(
   try {
     const data = await graphFetch(
       cfg,
-      `/teams/${teamId}/channels/${channelId}/messages/delta?$top=1`,
+      `/teams/${teamId}/channels/${channelId}/messages?$top=1`,
     );
-    const first = (data.value as GraphMessage[])[0];
-    return first?.createdDateTime ?? null;
+    const first = (data.value as Array<GraphMessage & { lastModifiedDateTime?: string }>)[0];
+    return first?.lastModifiedDateTime ?? first?.createdDateTime ?? null;
   } catch {
     return null;
   }
