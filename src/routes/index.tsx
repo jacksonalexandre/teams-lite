@@ -208,8 +208,7 @@ function TeamsLite() {
                   >
                     <span className="line-clamp-1 font-medium">{title}</span>
                     <span className="text-[11px] text-muted-foreground">
-                      {c.chatType === "oneOnOne" ? "1:1" : c.chatType === "group" ? "Grupo" : c.chatType}
-                      {" · "}
+                      {c.chatType === "group" ? "Grupo · " : ""}
                       {formatDate(c.lastUpdatedDateTime)}
                     </span>
                   </button>
