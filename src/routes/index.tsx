@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
-  loadConfig,
-  saveConfig,
-  clearConfig,
   signIn,
   signOut,
   ensureInit,
   getCurrentAccount,
   type TeamsConfig,
 } from "@/lib/msal";
+import { getTeamsConfig } from "@/lib/config.functions";
 import {
   listChats,
   listMessages,
@@ -24,8 +23,8 @@ export const Route = createFileRoute("/")({
 });
 
 function TeamsLite() {
+  const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [account, setAccount] = useState<{ name?: string; username: string } | null>(null);
   const [chats, setChats] = useState<GraphChat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,21 +36,18 @@ function TeamsLite() {
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Boot
+  // Boot: load config from server then try existing account
   useEffect(() => {
-    const cfg = loadConfig();
-    setConfig(cfg);
-    if (!cfg) {
-      setShowSettings(true);
-      return;
-    }
-    ensureInit(cfg)
-      .then(() => getCurrentAccount(cfg))
+    fetchConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        return ensureInit(cfg).then(() => getCurrentAccount(cfg));
+      })
       .then((acc) => {
         if (acc) setAccount({ name: acc.name, username: acc.username });
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  }, []); // eslint-disable-line
 
   // Load chats when signed in
   useEffect(() => {
@@ -94,7 +90,6 @@ function TeamsLite() {
   }, [messages]);
 
   const meId = useMemo(() => {
-    // username is upn/email; not the AAD object id, but we use it for member filtering fallback
     return account?.username;
   }, [account]);
 
@@ -172,12 +167,6 @@ function TeamsLite() {
               </button>
             )
           )}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-          >
-            Config
-          </button>
         </div>
       </header>
 
@@ -234,7 +223,7 @@ function TeamsLite() {
         <main className="flex min-w-0 flex-1 flex-col">
           {!activeId || !account ? (
             <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
-              {account ? "Selecione uma conversa" : "Não autenticado"}
+              {account ? "Selecione uma conversa" : config ? "Não autenticado" : "Carregando configuração…"}
             </div>
           ) : (
             <>
@@ -278,24 +267,6 @@ function TeamsLite() {
           )}
         </main>
       </div>
-
-      {showSettings && (
-        <SettingsModal
-          initial={config}
-          onClose={() => setShowSettings(false)}
-          onSave={(c) => {
-            saveConfig(c);
-            setConfig(c);
-            setShowSettings(false);
-            // Reload to re-init MSAL with new config cleanly
-            window.location.reload();
-          }}
-          onReset={() => {
-            clearConfig();
-            window.location.reload();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -308,17 +279,17 @@ function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
   const text =
-    m.body.contentType === "html"
-      ? stripHtml(m.body.content)
-      : m.body.content;
+    m.body.contentType === "html" ? stripHtml(m.body.content) : m.body.content;
   if (!text.trim()) return null;
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-        mine
-          ? "bg-primary text-primary-foreground rounded-br-sm"
-          : "bg-card text-card-foreground border border-border rounded-bl-sm"
-      }`}>
+      <div
+        className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+          mine
+            ? "bg-primary text-primary-foreground rounded-br-sm"
+            : "bg-card text-card-foreground border border-border rounded-bl-sm"
+        }`}
+      >
         {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
         <div className="whitespace-pre-wrap break-words">{text}</div>
         <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
@@ -326,86 +297,6 @@ function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function SettingsModal({
-  initial,
-  onClose,
-  onSave,
-  onReset,
-}: {
-  initial: TeamsConfig | null;
-  onClose: () => void;
-  onSave: (c: TeamsConfig) => void;
-  onReset: () => void;
-}) {
-  const [clientId, setClientId] = useState(initial?.clientId ?? "");
-  const [tenantId, setTenantId] = useState(initial?.tenantId ?? "common");
-  const redirectUri =
-    typeof window !== "undefined" ? `${window.location.origin}/auth-callback` : "";
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4">
-      <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl">
-        <h2 className="text-lg font-semibold">Configuração Azure AD</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Registre um app SPA no Azure AD e cole os IDs aqui. Adicione este URL como Redirect URI (tipo SPA):
-        </p>
-        <code className="mt-2 block break-all rounded-md bg-muted px-3 py-2 text-xs">{redirectUri}</code>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Permissões delegadas necessárias: <code>User.Read</code>, <code>Chat.ReadWrite</code>, <code>ChatMessage.Send</code>.
-        </p>
-
-        <div className="mt-5 space-y-3">
-          <Field label="Client ID (Application ID)">
-            <input
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value.trim())}
-              placeholder="00000000-0000-0000-0000-000000000000"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            />
-          </Field>
-          <Field label="Tenant ID">
-            <input
-              value={tenantId}
-              onChange={(e) => setTenantId(e.target.value.trim())}
-              placeholder="common, organizations ou GUID do tenant"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            />
-          </Field>
-        </div>
-
-        <div className="mt-6 flex items-center justify-between">
-          <button onClick={onReset} className="text-xs text-muted-foreground underline">
-            Limpar configuração
-          </button>
-          <div className="flex gap-2">
-            {initial && (
-              <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
-                Cancelar
-              </button>
-            )}
-            <button
-              onClick={() => clientId && onSave({ clientId, tenantId: tenantId || "common" })}
-              disabled={!clientId}
-              className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
-            >
-              Salvar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
   );
 }
 
