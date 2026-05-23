@@ -62,6 +62,8 @@ function TeamsLite() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
+  type Pending = { id: string; selKey: string; text: string; status: "sending" | "error"; error?: string };
+  const [pending, setPending] = useState<Pending[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevSelKeyRef = useRef<string | null>(null);
   const prevLastMsgIdRef = useRef<string | null>(null);
