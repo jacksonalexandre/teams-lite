@@ -468,7 +468,7 @@ function TeamsLite() {
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
                 {loadingMsgs && messages.length === 0 ? (
                   <EmptyHint text="Carregando mensagens…" />
-                ) : messages.length === 0 ? (
+                ) : messages.length === 0 && pending.filter((p) => p.selKey === selKey).length === 0 ? (
                   <EmptyHint text="Sem mensagens ainda." />
                 ) : (
                   <>
@@ -483,6 +483,16 @@ function TeamsLite() {
                     {messages.slice(-msgsVisibleCount).map((m) => (
                       <MessageBubble key={m.id} m={m} meName={account.name} />
                     ))}
+                    {pending
+                      .filter((p) => p.selKey === selKey)
+                      .map((p) => (
+                        <PendingBubble
+                          key={p.id}
+                          p={p}
+                          onRetry={() => retryPending(p.id)}
+                          onDiscard={() => discardPending(p.id)}
+                        />
+                      ))}
                   </>
                 )}
               </div>
@@ -504,9 +514,10 @@ function TeamsLite() {
                   <button
                     onClick={handleSend}
                     disabled={!draft.trim() || sending}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                   >
-                    {sending ? "…" : "Enviar"}
+                    {sending && <Loader2 size={14} className="animate-spin" />}
+                    {sending ? "Enviando…" : "Enviar"}
                   </button>
                 </div>
               </div>
