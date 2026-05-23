@@ -332,16 +332,16 @@ function TeamsLite() {
           {mode === "chats" && account && (
             <div className="flex items-center justify-between border-b border-border px-4 py-2">
               <span className="text-[11px] text-muted-foreground">
-                {showArchived ? "Arquivados" : "Ativos"} ({filteredChats.length})
+                {showHidden ? "Ocultos" : "Ativos"} ({filteredChats.length})
               </span>
               <button
                 onClick={() => {
-                  setShowArchived((v) => !v);
+                  setShowHidden((v) => !v);
                   setVisibleCount(7);
                 }}
                 className="text-[11px] font-medium text-primary hover:underline"
               >
-                {showArchived ? "Ver ativos" : `Ver arquivados (${archived.size})`}
+                {showHidden ? "Ver ativos" : "Ver ocultos"}
               </button>
             </div>
           )}
@@ -353,13 +353,14 @@ function TeamsLite() {
               loadingChats ? (
                 <EmptyHint text="Carregando…" />
               ) : filteredChats.length === 0 ? (
-                <EmptyHint text={showArchived ? "Nenhum chat arquivado." : "Nenhum chat encontrado."} />
+                <EmptyHint text={showHidden ? "Nenhum chat oculto." : "Nenhum chat encontrado."} />
               ) : (
                 <>
                   {filteredChats.slice(0, visibleCount).map((c) => {
                     const title = chatTitle(c, meId, account.name);
                     const active = selection?.kind === "chat" && selection.chatId === c.id;
-                    const isArch = archived.has(c.id);
+                    const isHidden = !!c.viewpoint?.isHidden;
+                    const isBusy = hidingId === c.id;
                     return (
                       <div
                         key={c.id}
@@ -380,12 +381,13 @@ function TeamsLite() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleArchive(c.id);
+                            toggleHide(c.id, isHidden);
                           }}
-                          title={isArch ? "Desarquivar" : "Arquivar"}
-                          className="opacity-0 group-hover:opacity-100 shrink-0 rounded px-1.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-background hover:text-foreground transition-opacity"
+                          disabled={isBusy}
+                          title={isHidden ? "Reexibir no Teams" : "Ocultar no Teams"}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1.5 text-muted-foreground hover:bg-background hover:text-foreground transition-opacity disabled:opacity-40"
                         >
-                          {isArch ? "↩" : "📁"}
+                          {isHidden ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                         </button>
                       </div>
                     );
