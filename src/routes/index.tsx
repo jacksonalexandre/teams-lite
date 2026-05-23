@@ -425,6 +425,9 @@ function TeamsLite() {
                       ? `${previewAuthor.split(" ")[0]}: `
                       : "";
                   const isGroup = c.chatType === "group" || c.chatType === "meeting";
+                  const otherUserId = !isGroup
+                    ? (c.members ?? []).find((m) => m.userId && m.userId !== meId)?.userId ?? undefined
+                    : undefined;
                   return (
                     <div
                       key={c.id}
@@ -434,7 +437,7 @@ function TeamsLite() {
                       }`}
                       title={title}
                     >
-                      <Avatar name={title} isGroup={isGroup} />
+                      <Avatar name={title} isGroup={isGroup} userId={otherUserId} cfg={config} />
                       <div className="flex min-w-0 flex-1 flex-col">
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="truncate text-left font-semibold text-foreground" title={title}>
