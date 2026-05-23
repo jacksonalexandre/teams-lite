@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Archive, ArchiveRestore } from "lucide-react";
+import { Archive, ArchiveRestore, Loader2, AlertCircle, X } from "lucide-react";
 import {
   signIn,
   signOut,
@@ -62,6 +62,8 @@ function TeamsLite() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
+  type Pending = { id: string; selKey: string; text: string; status: "sending" | "error"; error?: string };
+  const [pending, setPending] = useState<Pending[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevSelKeyRef = useRef<string | null>(null);
   const prevLastMsgIdRef = useRef<string | null>(null);
@@ -235,27 +237,53 @@ function TeamsLite() {
     }
   }
 
-  async function handleSend() {
-    if (!config || !selection || !draft.trim() || sending) return;
-    setSending(true);
-    const text = draft;
-    setDraft("");
+  async function doSend(p: Pending) {
+    if (!config) return;
+    const sel = selection;
+    if (!sel) return;
+    setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: "sending", error: undefined } : x)));
     try {
-      if (selection.kind === "chat") {
-        await sendMessage(config, selection.chatId, text);
-        const msgs = await listMessages(config, selection.chatId);
+      if (sel.kind === "chat") {
+        await sendMessage(config, sel.chatId, p.text);
+        const msgs = await listMessages(config, sel.chatId);
         setMessages(msgs);
       } else {
-        await sendChannelMessage(config, selection.teamId, selection.channelId, text);
-        const msgs = await listChannelMessages(config, selection.teamId, selection.channelId);
+        await sendChannelMessage(config, sel.teamId, sel.channelId, p.text);
+        const msgs = await listChannelMessages(config, sel.teamId, sel.channelId);
         setMessages(msgs);
       }
+      setPending((prev) => prev.filter((x) => x.id !== p.id));
     } catch (e) {
-      setError(String(e));
-      setDraft(text);
+      setPending((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: "error", error: String(e) } : x)));
+    }
+  }
+
+  async function handleSend() {
+    if (!config || !selection || !draft.trim() || sending) return;
+    const text = draft.trim();
+    setDraft("");
+    setSending(true);
+    const p: Pending = {
+      id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      selKey: selection.kind === "chat" ? `c:${selection.chatId}` : `ch:${selection.teamId}:${selection.channelId}`,
+      text,
+      status: "sending",
+    };
+    setPending((prev) => [...prev, p]);
+    try {
+      await doSend(p);
     } finally {
       setSending(false);
     }
+  }
+
+  function retryPending(id: string) {
+    const p = pending.find((x) => x.id === id);
+    if (p) doSend(p);
+  }
+
+  function discardPending(id: string) {
+    setPending((prev) => prev.filter((x) => x.id !== id));
   }
 
   const headerTitle = useMemo(() => {
@@ -440,7 +468,7 @@ function TeamsLite() {
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
                 {loadingMsgs && messages.length === 0 ? (
                   <EmptyHint text="Carregando mensagens…" />
-                ) : messages.length === 0 ? (
+                ) : messages.length === 0 && pending.filter((p) => p.selKey === selKey).length === 0 ? (
                   <EmptyHint text="Sem mensagens ainda." />
                 ) : (
                   <>
@@ -455,6 +483,16 @@ function TeamsLite() {
                     {messages.slice(-msgsVisibleCount).map((m) => (
                       <MessageBubble key={m.id} m={m} meName={account.name} />
                     ))}
+                    {pending
+                      .filter((p) => p.selKey === selKey)
+                      .map((p) => (
+                        <PendingBubble
+                          key={p.id}
+                          p={p}
+                          onRetry={() => retryPending(p.id)}
+                          onDiscard={() => discardPending(p.id)}
+                        />
+                      ))}
                   </>
                 )}
               </div>
@@ -476,9 +514,10 @@ function TeamsLite() {
                   <button
                     onClick={handleSend}
                     disabled={!draft.trim() || sending}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
                   >
-                    {sending ? "…" : "Enviar"}
+                    {sending && <Loader2 size={14} className="animate-spin" />}
+                    {sending ? "Enviando…" : "Enviar"}
                   </button>
                 </div>
               </div>
@@ -513,6 +552,52 @@ function MessageBubble({ m, meName }: { m: GraphMessage; meName?: string }) {
         <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
           {formatDateTime(m.createdDateTime)}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingBubble({
+  p,
+  onRetry,
+  onDiscard,
+}: {
+  p: { text: string; status: "sending" | "error"; error?: string };
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  const isError = p.status === "error";
+  return (
+    <div className="flex justify-end">
+      <div
+        className={`max-w-[75%] rounded-2xl rounded-br-sm px-4 py-2 text-sm shadow-sm ${
+          isError
+            ? "border border-destructive/40 bg-destructive/10 text-foreground"
+            : "bg-primary/70 text-primary-foreground"
+        }`}
+      >
+        <div className="whitespace-pre-wrap break-words">{p.text}</div>
+        {isError ? (
+          <div className="mt-1.5 flex items-center gap-2 text-[11px]">
+            <AlertCircle size={12} className="text-destructive" />
+            <span className="text-destructive">Falha ao enviar</span>
+            <button onClick={onRetry} className="ml-auto rounded px-2 py-0.5 font-medium underline hover:no-underline">
+              Reenviar
+            </button>
+            <button
+              onClick={onDiscard}
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              title="Descartar"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-primary-foreground/80">
+            <Loader2 size={10} className="animate-spin" />
+            <span>Enviando…</span>
+          </div>
+        )}
       </div>
     </div>
   );
