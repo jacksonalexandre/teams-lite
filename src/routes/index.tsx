@@ -496,6 +496,7 @@ function TeamsLite() {
                   {headerTitle}
                 </div>
               )}
+              <div className="relative flex min-h-0 flex-1 flex-col">
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5">
                 {loadingMsgs && messages.length === 0 ? (
                   <EmptyHint text="Carregando mensagens…" />
