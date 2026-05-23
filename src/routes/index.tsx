@@ -35,7 +35,10 @@ function TeamsLite() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(7);
+  const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevActiveIdRef = useRef<string | null>(null);
+  const prevLastMsgIdRef = useRef<string | null>(null);
 
   // Boot: load config from server then try existing account
   useEffect(() => {
