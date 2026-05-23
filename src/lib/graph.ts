@@ -80,10 +80,61 @@ export function chatTitle(chat: GraphChat, meId?: string, meName?: string): stri
     if (names.length <= 2) return names.join(", ");
     return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
   }
-  // Fallbacks for external/guest users where members lack displayName
   const previewName = chat.lastMessagePreview?.from?.user?.displayName;
   if (previewName && previewName !== meName) return previewName;
   const emails = others.map((m) => m.email).filter(Boolean) as string[];
   if (emails.length > 0) return emails.join(", ");
   return "Usuário externo";
 }
+
+// ============ Teams / Channels ============
+
+export type GraphTeam = {
+  id: string;
+  displayName: string;
+  description?: string;
+};
+
+export type GraphChannel = {
+  id: string;
+  displayName: string;
+  description?: string;
+  membershipType?: string;
+};
+
+export async function listJoinedTeams(cfg: TeamsConfig): Promise<GraphTeam[]> {
+  const data = await graphFetch(cfg, "/me/joinedTeams");
+  return data.value as GraphTeam[];
+}
+
+export async function listChannels(cfg: TeamsConfig, teamId: string): Promise<GraphChannel[]> {
+  const data = await graphFetch(cfg, `/teams/${teamId}/channels`);
+  return data.value as GraphChannel[];
+}
+
+export async function listChannelMessages(
+  cfg: TeamsConfig,
+  teamId: string,
+  channelId: string,
+): Promise<GraphMessage[]> {
+  const data = await graphFetch(
+    cfg,
+    `/teams/${teamId}/channels/${channelId}/messages?$top=50`,
+  );
+  return (data.value as GraphMessage[]).slice().reverse();
+}
+
+export async function sendChannelMessage(
+  cfg: TeamsConfig,
+  teamId: string,
+  channelId: string,
+  text: string,
+) {
+  return graphFetch(cfg, `/teams/${teamId}/channels/${channelId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      body: { contentType: "text", content: text },
+    }),
+  });
+}
+

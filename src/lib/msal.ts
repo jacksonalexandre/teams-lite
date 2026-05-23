@@ -11,7 +11,15 @@ export type TeamsConfig = {
   tenantId: string; // "common" | "organizations" | tenant GUID
 };
 
-export const GRAPH_SCOPES = ["User.Read", "Chat.ReadWrite", "ChatMessage.Send"];
+export const GRAPH_SCOPES = [
+  "User.Read",
+  "Chat.ReadWrite",
+  "ChatMessage.Send",
+  "Team.ReadBasic.All",
+  "Channel.ReadBasic.All",
+  "ChannelMessage.Read.All",
+  "ChannelMessage.Send",
+];
 
 let pca: PublicClientApplication | null = null;
 let initialized = false;
