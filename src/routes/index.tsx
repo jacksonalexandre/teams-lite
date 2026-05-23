@@ -54,6 +54,7 @@ function TeamsLite() {
   useEffect(() => {
     if (!config || !account) return;
     setLoadingChats(true);
+    setVisibleCount(7);
     listChats(config)
       .then((cs) => {
         setChats(cs);
