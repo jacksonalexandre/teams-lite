@@ -769,7 +769,7 @@ function MessageImage({ img, cfg }: { img: ParsedImage; cfg?: TeamsConfig | null
     };
   }, [img.hosted, img.src, cfg]);
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     maxWidth: 320,
     maxHeight: 320,
     width: img.width ? Math.min(img.width, 320) : undefined,
