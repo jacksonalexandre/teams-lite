@@ -679,15 +679,43 @@ function EmptyHint({ text }: { text: string }) {
   return <div className="px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>;
 }
 
+type ParsedImage = { src: string; width?: number; height?: number; hosted: boolean };
+
+function parseMessageHtml(html: string): { text: string; images: ParsedImage[] } {
+  if (typeof window === "undefined") {
+    return { text: html.replace(/<[^>]*>/g, ""), images: [] };
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  // remove attachment placeholders
+  doc.querySelectorAll("attachment").forEach((n) => n.remove());
+  const images: ParsedImage[] = [];
+  doc.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src") || "";
+    if (!src) return;
+    const hosted = /graph\.microsoft\.com\/.+\/hostedContents\//i.test(src);
+    const w = parseInt(img.getAttribute("width") || "", 10);
+    const h = parseInt(img.getAttribute("height") || "", 10);
+    images.push({
+      src,
+      width: Number.isFinite(w) ? w : undefined,
+      height: Number.isFinite(h) ? h : undefined,
+      hosted,
+    });
+    img.remove();
+  });
+  const text = (doc.body.textContent || "").trim();
+  return { text, images };
+}
+
 function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
-  const text =
+  const { text, images } =
     m.body.contentType === "html"
-      ? stripHtml(stripAttachmentTags(m.body.content))
-      : m.body.content;
+      ? parseMessageHtml(m.body.content)
+      : { text: m.body.content, images: [] as ParsedImage[] };
   const attachments = (m.attachments ?? []).filter((a) => !!a);
-  if (!text.trim() && attachments.length === 0) return null;
+  if (!text.trim() && attachments.length === 0 && images.length === 0) return null;
   const fromUserId = m.from?.user?.id ?? undefined;
   return (
     <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
@@ -701,8 +729,15 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
       >
         {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
         {text.trim() && <div className="whitespace-pre-wrap break-words">{text}</div>}
+        {images.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {images.map((img, i) => (
+              <MessageImage key={`${img.src}-${i}`} img={img} cfg={cfg} />
+            ))}
+          </div>
+        )}
         {attachments.length > 0 && (
-          <div className={`mt-2 flex flex-col gap-1.5 ${text.trim() ? "" : ""}`}>
+          <div className="mt-2 flex flex-col gap-1.5">
             {attachments.map((a) => (
               <AttachmentChip key={a.id} a={a} mine={mine} />
             ))}
@@ -715,6 +750,62 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
     </div>
   );
 }
+
+function MessageImage({ img, cfg }: { img: ParsedImage; cfg?: TeamsConfig | null }) {
+  const [url, setUrl] = useState<string | null>(img.hosted ? null : img.src);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!img.hosted) return;
+    if (!cfg) return;
+    let cancelled = false;
+    (async () => {
+      const u = await getHostedContentUrl(cfg, img.src);
+      if (cancelled) return;
+      if (u) setUrl(u);
+      else setFailed(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [img.hosted, img.src, cfg]);
+
+  const style: React.CSSProperties = {
+    maxWidth: 320,
+    maxHeight: 320,
+    width: img.width ? Math.min(img.width, 320) : undefined,
+    height: "auto",
+  };
+
+  if (failed) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground">
+        Não foi possível carregar a imagem.
+      </div>
+    );
+  }
+  if (!url) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-lg border border-border bg-muted/40"
+        style={{ width: style.width ?? 240, height: 140 }}
+      >
+        <Loader2 size={16} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+      <img
+        src={url}
+        alt=""
+        style={style}
+        className="rounded-lg border border-border object-contain"
+        onError={() => setFailed(true)}
+      />
+    </a>
+  );
+}
+
 
 function stripAttachmentTags(html: string) {
   return html.replace(/<attachment[^>]*\/?>(\s*<\/attachment>)?/gi, "");
