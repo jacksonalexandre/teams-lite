@@ -1,73 +1,46 @@
-## Contexto
+## Por que as imagens não aparecem
 
-Hoje, `MessageBubble` (src/routes/index.tsx:677) faz `stripHtml(m.body.content)` e ignora completamente `attachments[]`. Componentes do Loop chegam exatamente como `<attachment id="…"/>` no corpo HTML + um item em `message.attachments[]` — por isso eles "somem" na UI.
+Imagens coladas/enviadas no Teams vêm no `body.content` (HTML) como:
 
-## O que o Microsoft Graph entrega (e o que NÃO entrega)
-
-Um Loop component em uma mensagem do Teams aparece assim:
-
-```json
-{
-  "body": { "contentType": "html", "content": "<attachment id=\"abc123\"></attachment>" },
-  "attachments": [{
-    "id": "abc123",
-    "contentType": "application/vnd.microsoft.card.fluidEmbedCard",
-    "contentUrl": "https://contoso-my.sharepoint.com/.../FluidPreview.aspx?...",
-    "name": "Lista de tarefas",
-    "content": "{...metadados JSON...}"
-  }]
-}
+```html
+<img src="https://graph.microsoft.com/v1.0/chats/{chatId}/messages/{msgId}/hostedContents/{cid}/$value"
+     itemid="..." width="..." height="..." />
 ```
 
-**A Graph NÃO retorna o conteúdo renderizado** (tabela, lista, tarefas etc.). O Loop é um container vivo do **Fluid Framework** hospedado no OneDrive/SharePoint do usuário. Renderizar de verdade exige:
+Dois problemas hoje em `MessageBubble`:
 
-1. SDK do Fluid Framework + container do Loop (`@fluidframework/azure-client` + `@microsoft/loop-*`), que **não é público** fora dos hosts oficiais (Teams, Outlook, Loop app, Office).
-2. Permissões adicionais (`Files.Read.All`, `Sites.Read.All`) para acessar o arquivo `.fluid` no OneDrive do remetente.
-3. Acesso ao serviço Azure Fluid Relay autenticado — bloqueado para apps de terceiros.
+1. `stripHtml(stripAttachmentTags(...))` apaga toda tag HTML — `<img>` some junto.
+2. Mesmo se renderizássemos `<img src="...">` direto, o navegador faria GET **sem** o header `Authorization: Bearer ...` que a Graph exige → 401. URLs de `hostedContents/$value` **só** funcionam com token.
 
-**Conclusão:** renderizar o Loop *embutido como no Teams* não é viável num app externo. É uma limitação de plataforma, não algo que faltou implementar.
+## Solução
 
-## O que dá para fazer (recomendado)
-
-Renderizar um **"cartão de Loop"** no lugar do `<attachment>`: ícone, nome do componente, tipo (lista/tabela/tarefas/parágrafo) e botão **"Abrir no Teams/Office"** apontando para o `contentUrl`. É exatamente o que o Outlook Web faz quando não consegue carregar o componente ao vivo.
+Buscar cada `hostedContent` via `fetch` autenticado (com `getAccessToken`), converter para blob e usar `URL.createObjectURL()` no `<img src>`. Cachear por id da imagem.
 
 ### Mudanças
 
-1. **src/lib/graph.ts** — estender `GraphMessage`:
-   ```ts
-   attachments?: Array<{
-     id: string;
-     contentType: string;
-     contentUrl?: string;
-     name?: string;
-     content?: string;
-   }>;
-   ```
-   E adicionar `$expand=...` ou garantir que `listMessages` retorne `attachments` (a Graph já inclui por padrão em `/chats/{id}/messages`).
+1. **src/lib/graph.ts**
+   - Adicionar `getHostedContentUrl(cfg, url)`: recebe a URL da Graph (`…/hostedContents/{id}/$value`), faz `fetch` com Bearer, retorna `URL.createObjectURL(blob)`. Cache em `Map<string, Promise<string|null>>` análogo ao `photoCache` já existente.
 
-2. **src/routes/index.tsx — `MessageBubble`**:
-   - Parsear o HTML do body procurando `<attachment id="…"/>` e casar com `m.attachments`.
-   - Renderizar o texto restante normalmente (`stripHtml`).
-   - Para cada attachment Loop (`contentType` começando com `application/vnd.microsoft.card.fluidEmbedCard` ou `loop*`), renderizar um chip:
-     ```
-     [🔗 ícone Loop]  Nome do componente
-                      Lista · Abrir no Microsoft Teams ↗
-     ```
-     Link abre `contentUrl` em nova aba (o usuário cai no Office/Teams autenticado).
-   - Tratar também outros attachments comuns que hoje somem: `reference` (link de arquivo OneDrive), `messageReference` (citações/reply).
+2. **src/routes/index.tsx — `MessageBubble`**
+   - Em vez de `stripHtml`, parsear o HTML do body com `DOMParser` quando `contentType === "html"`:
+     - Extrair `<img>` cujo `src` começa com `https://graph.microsoft.com/.../hostedContents/`.
+     - Remover essas tags do DOM e usar o `textContent` resultante como texto.
+     - Renderizar as imagens abaixo do texto via um novo componente `<HostedImage url=... cfg=... />` que faz `useEffect` chamando `getHostedContentUrl`, guarda em state e exibe `<img src={blobUrl}>` (com placeholder/loader enquanto carrega).
+   - Imagens externas (`src` que não é do Graph, ex.: gifs públicos, emojis customizados) podem ir direto como `<img src={…}>` sem auth.
+   - Relaxar o guard `if (!text.trim() && attachments.length === 0 && images.length === 0) return null;` para não descartar mensagens só com imagem.
 
-3. **Não-mudança**: nenhuma mudança em `msal.ts` / scopes — `Chat.Read` já basta para os metadados.
+3. **Preview na sidebar** (`listChats` em `index.tsx:451`): quando `preview.body.content` só tem `<img>`, hoje fica vazio. Mostrar fallback `"📷 Imagem"` quando o texto após `stripHtml` é vazio mas o HTML continha `<img>`.
 
 ### Detalhes técnicos
 
-- `contentType`s relevantes para Loop: `application/vnd.microsoft.card.fluidEmbedCard`, `application/vnd.microsoft.card.loopcomponent` (varia conforme a idade da mensagem).
-- O campo `attachment.content` (string JSON) traz `componentType` (`fluidlist`, `fluidtable`, `fluidtask`, `fluidparagraph`…) — usar para escolher rótulo/ícone.
-- Se o body tem **só** `<attachment>` e nada de texto, hoje a mensagem é totalmente filtrada por `if (!text.trim()) return null;` (linha 681). Precisa relaxar essa condição quando há attachments renderizáveis.
+- O fetch retorna `image/png`, `image/jpeg`, `image/gif` (animado preserva). Apenas usar `res.blob()`.
+- Cache key = URL completa (inclui chatId + msgId + contentId — único e estável).
+- Liberar `URL.revokeObjectURL` no unmount não é estritamente necessário porque o cache mantém o blob vivo durante a sessão; aceitável dado o volume.
+- Tamanho: respeitar `width`/`height` originais do `<img>` quando presentes, com `max-width: 320px` para não estourar a bolha.
+- Clique na imagem → abrir em nova aba (também via blob URL).
 
-## Fora de escopo (deixar claro ao usuário)
+## Fora de escopo
 
-- Edição ao vivo do Loop dentro do app.
-- Renderização do conteúdo atual da lista/tabela.
-- Sincronização em tempo real do componente.
-
-Ambos exigiriam o Fluid Framework + Loop SDK proprietários da Microsoft.
+- Lightbox/galeria.
+- Upload/envio de imagem pelo nosso app.
+- Imagens dentro de cartões adaptativos complexos.

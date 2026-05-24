@@ -44,6 +44,31 @@ export function getUserPhotoUrl(cfg: TeamsConfig, userId: string): Promise<strin
   return p;
 }
 
+// =========== Hosted contents (inline images in messages) ===========
+
+const hostedContentCache = new Map<string, Promise<string | null>>();
+
+export function getHostedContentUrl(cfg: TeamsConfig, url: string): Promise<string | null> {
+  if (!url) return Promise.resolve(null);
+  const cached = hostedContentCache.get(url);
+  if (cached) return cached;
+  const p = (async () => {
+    try {
+      const token = await getAccessToken(cfg);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  })();
+  hostedContentCache.set(url, p);
+  return p;
+}
+
 export type GraphChatMember = {
   displayName?: string | null;
   userId?: string | null;
