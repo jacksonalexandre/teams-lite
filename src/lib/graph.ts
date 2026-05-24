@@ -66,6 +66,15 @@ export type GraphChat = {
   } | null;
 };
 
+export type GraphAttachment = {
+  id: string;
+  contentType: string;
+  contentUrl?: string | null;
+  name?: string | null;
+  content?: string | null;
+  thumbnailUrl?: string | null;
+};
+
 export type GraphMessage = {
   id: string;
   createdDateTime: string;
@@ -73,6 +82,7 @@ export type GraphMessage = {
     user?: { displayName?: string; id?: string };
   } | null;
   body: { contentType: "html" | "text"; content: string };
+  attachments?: GraphAttachment[];
 };
 
 export async function listChats(cfg: TeamsConfig): Promise<GraphChat[]> {
