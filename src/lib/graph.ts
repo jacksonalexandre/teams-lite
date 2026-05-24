@@ -173,6 +173,13 @@ export function chatTitle(chat: GraphChat, meId?: string, meName?: string): stri
   return "Usuário externo";
 }
 
+export function buildTeamsVideoLink(chat: GraphChat, meId?: string): string | null {
+  const others = (chat.members ?? []).filter((m) => !meId || m.userId !== meId);
+  const emails = others.map((m) => m.email).filter((e): e is string => !!e);
+  if (emails.length === 0) return null;
+  return `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(emails.join(","))}&withVideo=true`;
+}
+
 // ============ Teams / Channels ============
 
 export type GraphTeam = {
