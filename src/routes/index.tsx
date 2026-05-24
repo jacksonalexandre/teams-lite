@@ -807,9 +807,6 @@ function MessageImage({ img, cfg }: { img: ParsedImage; cfg?: TeamsConfig | null
 }
 
 
-function stripAttachmentTags(html: string) {
-  return html.replace(/<attachment[^>]*\/?>(\s*<\/attachment>)?/gi, "");
-}
 
 function loopLabel(a: { contentType: string; content?: string | null; name?: string | null }) {
   const ct = (a.contentType || "").toLowerCase();
