@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2 } from "lucide-react";
+import { Loader2, Video } from "lucide-react";
 import { signIn, signOut, ensureInit, getCurrentAccount, type TeamsConfig } from "@/lib/msal";
 import { getTeamsConfig } from "@/lib/config.functions";
-import { chatTitle } from "@/lib/graph";
+import { chatTitle, buildTeamsVideoLink } from "@/lib/graph";
 import { useChats } from "@/hooks/useChats";
 import { useChannels } from "@/hooks/useChannels";
 import { useMessages, useScrollBehavior } from "@/hooks/useMessages";
