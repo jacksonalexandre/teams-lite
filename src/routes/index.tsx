@@ -221,7 +221,23 @@ function TeamsLite() {
                     }
                     return <Avatar name={headerTitle} isGroup size={32} />;
                   })()}
-                  <span>{headerTitle}</span>
+                  <span className="flex-1 truncate">{headerTitle}</span>
+                  {(() => {
+                    if (selection?.kind !== "chat") return null;
+                    const c = chats.find((x) => x.id === selection.chatId);
+                    if (!c || c.chatType !== "oneOnOne") return null;
+                    const url = buildTeamsVideoLink(c, meId);
+                    return (
+                      <button
+                        onClick={() => url && window.open(url, "_blank", "noopener")}
+                        disabled={!url}
+                        title={url ? "Chamada de vídeo no Teams" : "E-mail do contato indisponível"}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Video size={16} />
+                      </button>
+                    );
+                  })()}
                 </div>
               )}
               <div className="relative flex min-h-0 flex-1 flex-col">
