@@ -727,7 +727,14 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
             : "bg-card text-card-foreground border border-border rounded-bl-sm"
         }`}
       >
-        {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
+        <div className={`mb-1 text-[11px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+          {mine ? formatDateTime(m.createdDateTime) : (
+            <>
+              <span className="font-medium opacity-90">{author}</span>
+              <span className="opacity-60"> · {formatDateTime(m.createdDateTime)}</span>
+            </>
+          )}
+        </div>
         {text.trim() && <div className="whitespace-pre-wrap break-words">{text}</div>}
         {images.length > 0 && (
           <div className="mt-2 flex flex-col gap-1.5">
@@ -743,9 +750,7 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
             ))}
           </div>
         )}
-        <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-          {formatDateTime(m.createdDateTime)}
-        </div>
+
       </div>
     </div>
   );
