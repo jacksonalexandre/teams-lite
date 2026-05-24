@@ -448,11 +448,15 @@ function TeamsLite() {
                   const preview = c.lastMessagePreview;
                   const previewAuthor = preview?.from?.user?.displayName;
                   const previewIsMe = !!account.name && previewAuthor === account.name;
-                  const previewText = preview?.body?.content
+                  const rawPreview = preview?.body?.content ?? "";
+                  const previewStripped = preview?.body?.content
                     ? preview.body.contentType === "html"
                       ? stripHtml(preview.body.content)
                       : preview.body.content
                     : "";
+                  const previewText =
+                    previewStripped.trim() ||
+                    (/<img\b/i.test(rawPreview) ? "📷 Imagem" : "");
                   const previewPrefix = previewIsMe
                     ? "Você: "
                     : previewAuthor
