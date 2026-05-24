@@ -1,35 +1,73 @@
-# Carregar fotos dos usuários
+## Contexto
 
-Hoje o `Avatar` em `src/routes/index.tsx` mostra apenas iniciais coloridas — nunca chegamos a buscar a foto real no Microsoft Graph. Para exibir as imagens corretamente faltam quatro coisas:
+Hoje, `MessageBubble` (src/routes/index.tsx:677) faz `stripHtml(m.body.content)` e ignora completamente `attachments[]`. Componentes do Loop chegam exatamente como `<attachment id="…"/>` no corpo HTML + um item em `message.attachments[]` — por isso eles "somem" na UI.
 
-## 1. Escopo de permissão
-Em `src/lib/msal.ts`, adicionar `User.ReadBasic.All` aos `GRAPH_SCOPES`. Sem ele, só conseguimos a foto do próprio usuário (`/me/photo/$value`), não a dos outros membros do chat. Usuários existentes precisarão re-consentir (popup automático na próxima chamada).
+## O que o Microsoft Graph entrega (e o que NÃO entrega)
 
-## 2. Helper para buscar a foto
-Em `src/lib/graph.ts`, criar `getUserPhotoUrl(cfg, userId)`:
-- Faz `GET /users/{userId}/photo/$value` com `Authorization: Bearer …` (não usa `graphFetch` porque a resposta é binária, não JSON).
-- Em sucesso, converte para `Blob` e retorna `URL.createObjectURL(blob)`.
-- Em 404 (usuário sem foto) ou erro, retorna `null`.
+Um Loop component em uma mensagem do Teams aparece assim:
 
-## 3. Cache em memória
-Criar um `Map<userId, Promise<string | null>>` no módulo para deduplicar requisições — cada userId é buscado uma única vez por sessão. Sem cache, cada render do chat dispararia novas chamadas.
+```json
+{
+  "body": { "contentType": "html", "content": "<attachment id=\"abc123\"></attachment>" },
+  "attachments": [{
+    "id": "abc123",
+    "contentType": "application/vnd.microsoft.card.fluidEmbedCard",
+    "contentUrl": "https://contoso-my.sharepoint.com/.../FluidPreview.aspx?...",
+    "name": "Lista de tarefas",
+    "content": "{...metadados JSON...}"
+  }]
+}
+```
 
-## 4. Wiring no componente
-Em `src/routes/index.tsx`:
-- Estender `Avatar` para aceitar `userId?: string` e, quando presente, usar um hook (`useUserPhoto`) que consulta o cache e dispara o fetch.
-- Enquanto a foto carrega ou se falhar, mantém o fallback atual (iniciais + cor por nome).
-- Passar `userId` nos dois pontos de uso:
-  - Lista de chats (linha ~436): para `oneOnOne`, usar o `userId` do outro membro; manter ícone de grupo nos demais.
-  - Header da conversa selecionada (linha ~490 — header do chat aberto): mesmo critério.
-- Nas mensagens (`MessageBubble`), também mostrar avatar do remetente usando `message.from.user.id` — hoje o balão não tem avatar; este é o lugar onde a falta de foto é mais visível no Teams Web.
+**A Graph NÃO retorna o conteúdo renderizado** (tabela, lista, tarefas etc.). O Loop é um container vivo do **Fluid Framework** hospedado no OneDrive/SharePoint do usuário. Renderizar de verdade exige:
 
-## Detalhes técnicos
+1. SDK do Fluid Framework + container do Loop (`@fluidframework/azure-client` + `@microsoft/loop-*`), que **não é público** fora dos hosts oficiais (Teams, Outlook, Loop app, Office).
+2. Permissões adicionais (`Files.Read.All`, `Sites.Read.All`) para acessar o arquivo `.fluid` no OneDrive do remetente.
+3. Acesso ao serviço Azure Fluid Relay autenticado — bloqueado para apps de terceiros.
 
-- A resposta de `/photo/$value` é uma imagem JPEG. Object URLs são criadas uma vez e reutilizadas pelo cache; não precisamos revogar durante a sessão.
-- Tratar 404 silenciosamente (muitos usuários não têm foto definida) — não logar como erro.
-- O cache é por `userId`, então funciona tanto para membros de chats quanto para remetentes de mensagens em canais.
-- Não tocar em lógica de chats/mensagens/loader — apenas apresentação.
+**Conclusão:** renderizar o Loop *embutido como no Teams* não é viável num app externo. É uma limitação de plataforma, não algo que faltou implementar.
 
-## Fora de escopo
-- Avatar composto (mosaico) para grupos — mantém o ícone de grupo atual.
-- Persistência do cache entre reloads (IndexedDB) — só memória por enquanto.
+## O que dá para fazer (recomendado)
+
+Renderizar um **"cartão de Loop"** no lugar do `<attachment>`: ícone, nome do componente, tipo (lista/tabela/tarefas/parágrafo) e botão **"Abrir no Teams/Office"** apontando para o `contentUrl`. É exatamente o que o Outlook Web faz quando não consegue carregar o componente ao vivo.
+
+### Mudanças
+
+1. **src/lib/graph.ts** — estender `GraphMessage`:
+   ```ts
+   attachments?: Array<{
+     id: string;
+     contentType: string;
+     contentUrl?: string;
+     name?: string;
+     content?: string;
+   }>;
+   ```
+   E adicionar `$expand=...` ou garantir que `listMessages` retorne `attachments` (a Graph já inclui por padrão em `/chats/{id}/messages`).
+
+2. **src/routes/index.tsx — `MessageBubble`**:
+   - Parsear o HTML do body procurando `<attachment id="…"/>` e casar com `m.attachments`.
+   - Renderizar o texto restante normalmente (`stripHtml`).
+   - Para cada attachment Loop (`contentType` começando com `application/vnd.microsoft.card.fluidEmbedCard` ou `loop*`), renderizar um chip:
+     ```
+     [🔗 ícone Loop]  Nome do componente
+                      Lista · Abrir no Microsoft Teams ↗
+     ```
+     Link abre `contentUrl` em nova aba (o usuário cai no Office/Teams autenticado).
+   - Tratar também outros attachments comuns que hoje somem: `reference` (link de arquivo OneDrive), `messageReference` (citações/reply).
+
+3. **Não-mudança**: nenhuma mudança em `msal.ts` / scopes — `Chat.Read` já basta para os metadados.
+
+### Detalhes técnicos
+
+- `contentType`s relevantes para Loop: `application/vnd.microsoft.card.fluidEmbedCard`, `application/vnd.microsoft.card.loopcomponent` (varia conforme a idade da mensagem).
+- O campo `attachment.content` (string JSON) traz `componentType` (`fluidlist`, `fluidtable`, `fluidtask`, `fluidparagraph`…) — usar para escolher rótulo/ícone.
+- Se o body tem **só** `<attachment>` e nada de texto, hoje a mensagem é totalmente filtrada por `if (!text.trim()) return null;` (linha 681). Precisa relaxar essa condição quando há attachments renderizáveis.
+
+## Fora de escopo (deixar claro ao usuário)
+
+- Edição ao vivo do Loop dentro do app.
+- Renderização do conteúdo atual da lista/tabela.
+- Sincronização em tempo real do componente.
+
+Ambos exigiriam o Fluid Framework + Loop SDK proprietários da Microsoft.

@@ -677,8 +677,12 @@ function EmptyHint({ text }: { text: string }) {
 function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
-  const text = m.body.contentType === "html" ? stripHtml(m.body.content) : m.body.content;
-  if (!text.trim()) return null;
+  const text =
+    m.body.contentType === "html"
+      ? stripHtml(stripAttachmentTags(m.body.content))
+      : m.body.content;
+  const attachments = (m.attachments ?? []).filter((a) => !!a);
+  if (!text.trim() && attachments.length === 0) return null;
   const fromUserId = m.from?.user?.id ?? undefined;
   return (
     <div className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
@@ -691,7 +695,14 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
         }`}
       >
         {!mine && <div className="mb-0.5 text-[11px] font-medium opacity-70">{author}</div>}
-        <div className="whitespace-pre-wrap break-words">{text}</div>
+        {text.trim() && <div className="whitespace-pre-wrap break-words">{text}</div>}
+        {attachments.length > 0 && (
+          <div className={`mt-2 flex flex-col gap-1.5 ${text.trim() ? "" : ""}`}>
+            {attachments.map((a) => (
+              <AttachmentChip key={a.id} a={a} mine={mine} />
+            ))}
+          </div>
+        )}
         <div className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
           {formatDateTime(m.createdDateTime)}
         </div>
@@ -699,6 +710,92 @@ function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; c
     </div>
   );
 }
+
+function stripAttachmentTags(html: string) {
+  return html.replace(/<attachment[^>]*\/?>(\s*<\/attachment>)?/gi, "");
+}
+
+function loopLabel(a: { contentType: string; content?: string | null; name?: string | null }) {
+  const ct = (a.contentType || "").toLowerCase();
+  let componentType = "";
+  try {
+    if (a.content) {
+      const parsed = JSON.parse(a.content);
+      componentType = String(parsed?.componentType || parsed?.LoopComponentType || "").toLowerCase();
+    }
+  } catch {
+    /* ignore */
+  }
+  const isLoop =
+    ct.includes("fluidembedcard") ||
+    ct.includes("loopcomponent") ||
+    ct.includes("fluid") ||
+    componentType.startsWith("fluid");
+  if (!isLoop) return null;
+  const map: Record<string, string> = {
+    fluidlist: "Lista",
+    fluidtable: "Tabela",
+    fluidtask: "Tarefas",
+    fluidparagraph: "Parágrafo",
+    fluidchecklist: "Checklist",
+  };
+  const kind = map[componentType] || "Componente do Loop";
+  return { kind, name: a.name || kind };
+}
+
+function AttachmentChip({ a, mine }: { a: NonNullable<GraphMessage["attachments"]>[number]; mine: boolean }) {
+  const loop = loopLabel(a);
+  const baseCls = mine
+    ? "border-primary-foreground/30 bg-primary-foreground/10 hover:bg-primary-foreground/20"
+    : "border-border bg-muted/40 hover:bg-muted";
+  const subCls = mine ? "text-primary-foreground/70" : "text-muted-foreground";
+
+  if (loop) {
+    return (
+      <a
+        href={a.contentUrl || "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 transition-colors ${baseCls}`}
+      >
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#7B83EB]/15 text-[#7B83EB]">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
+            <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm4.5 11h-3v3a1.5 1.5 0 0 1-3 0v-3h-3a1.5 1.5 0 0 1 0-3h3V7a1.5 1.5 0 0 1 3 0v3h3a1.5 1.5 0 0 1 0 3Z" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-medium">{loop.name}</div>
+          <div className={`text-[11px] ${subCls}`}>{loop.kind} · Abrir no Microsoft Loop ↗</div>
+        </div>
+      </a>
+    );
+  }
+
+  // Fallback for other attachments (reference/files/cards)
+  const ct = (a.contentType || "").toLowerCase();
+  const isReference = ct.includes("reference");
+  const label = isReference ? "Arquivo" : "Anexo";
+  return (
+    <a
+      href={a.contentUrl || "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 transition-colors ${baseCls}`}
+    >
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-foreground/10">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium">{a.name || label}</div>
+        <div className={`text-[11px] ${subCls}`}>{a.contentUrl ? "Abrir ↗" : label}</div>
+      </div>
+    </a>
+  );
+}
+
 
 function PendingBubble({
   p,
