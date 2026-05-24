@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2 } from "lucide-react";
+import { Loader2, Video } from "lucide-react";
 import { signIn, signOut, ensureInit, getCurrentAccount, type TeamsConfig } from "@/lib/msal";
 import { getTeamsConfig } from "@/lib/config.functions";
-import { chatTitle } from "@/lib/graph";
+import { chatTitle, buildTeamsVideoLink } from "@/lib/graph";
 import { useChats } from "@/hooks/useChats";
 import { useChannels } from "@/hooks/useChannels";
 import { useMessages, useScrollBehavior } from "@/hooks/useMessages";
@@ -221,7 +221,23 @@ function TeamsLite() {
                     }
                     return <Avatar name={headerTitle} isGroup size={32} />;
                   })()}
-                  <span>{headerTitle}</span>
+                  <span className="flex-1 truncate">{headerTitle}</span>
+                  {(() => {
+                    if (selection?.kind !== "chat") return null;
+                    const c = chats.find((x) => x.id === selection.chatId);
+                    if (!c || c.chatType !== "oneOnOne") return null;
+                    const url = buildTeamsVideoLink(c, meId);
+                    return (
+                      <button
+                        onClick={() => url && window.open(url, "_blank", "noopener")}
+                        disabled={!url}
+                        title={url ? "Chamada de vídeo no Teams" : "E-mail do contato indisponível"}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Video size={16} />
+                      </button>
+                    );
+                  })()}
                 </div>
               )}
               <div className="relative flex min-h-0 flex-1 flex-col">
