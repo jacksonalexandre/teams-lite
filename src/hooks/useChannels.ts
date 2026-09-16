@@ -18,8 +18,8 @@ export function useChannels(config: TeamsConfig | null, account: unknown, active
   useEffect(() => {
     if (!config || !account || !active) return;
     let cancelled = false;
-    setLoading(true);
     (async () => {
+      setLoading(true);
       try {
         const teams = await listJoinedTeams(config);
         const perTeam = await Promise.all(

@@ -92,8 +92,13 @@ export function useScrollBehavior(messages: GraphMessage[], selKey: string | nul
   const [hasNewBelow, setHasNewBelow] = useState(false);
   const prevSelKeyRef = useRef<string | null>(null);
   const prevLastMsgIdRef = useRef<string | null>(null);
+  const [resetSelKey, setResetSelKey] = useState<string | null>(null);
 
-  useEffect(() => { setHasNewBelow(false); setAtBottom(true); }, [selKey]);
+  if (resetSelKey !== selKey) {
+    setResetSelKey(selKey);
+    setHasNewBelow(false);
+    setAtBottom(true);
+  }
 
   useEffect(() => {
     const el = scrollRef.current;

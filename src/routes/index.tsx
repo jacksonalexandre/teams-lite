@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Video } from "lucide-react";
 import { signIn, signOut, ensureInit, getCurrentAccount, type TeamsConfig } from "@/lib/msal";
+import type { AccountInfo } from "@azure/msal-browser";
 import { getTeamsConfig } from "@/lib/config.functions";
 import { chatTitle, buildTeamsVideoLink } from "@/lib/graph";
 import { useChats } from "@/hooks/useChats";
@@ -29,14 +30,27 @@ function EmptyHint({ text }: { text: string }) {
   return <div className="px-4 py-10 text-center text-xs text-muted-foreground">{text}</div>;
 }
 
+type AppAccount = { name?: string; username: string; oid?: string; tid?: string };
+
+function toAccount(acc: AccountInfo): AppAccount {
+  const claims = acc.idTokenClaims ?? {};
+  return {
+    name: acc.name,
+    username: acc.username,
+    oid: claims.oid || acc.localAccountId,
+    tid: claims.tid || acc.tenantId,
+  };
+}
+
 function TeamsLite() {
   const fetchConfig = useServerFn(getTeamsConfig);
   const [config, setConfig] = useState<TeamsConfig | null>(null);
-  const [account, setAccount] = useState<{ name?: string; username: string; oid?: string; tid?: string } | null>(null);
+  const [account, setAccount] = useState<AppAccount | null>(null);
   const [mode, setMode] = useState<Mode>("chats");
   const [selection, setSelection] = useState<Selection>(null);
   const [draft, setDraft] = useState("");
   const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
+  const [prevSelKey, setPrevSelKey] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
 
   const { chats, loading: loadingChats, hidingId, error: chatsError, toggleHide } = useChats(config, account, mode === "chats");
@@ -54,14 +68,16 @@ function TeamsLite() {
       })
       .then((acc) => {
         if (acc) {
-          const claims = (acc as any).idTokenClaims ?? {};
-          setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || (acc as any).tenantId });
+          setAccount(toAccount(acc));
         }
       })
       .catch((e) => setInitError(String(e)));
   }, []); // eslint-disable-line
 
-  useEffect(() => { setMsgsVisibleCount(7); }, [selKey]);
+  if (prevSelKey !== selKey) {
+    setPrevSelKey(selKey);
+    setMsgsVisibleCount(7);
+  }
 
   const meId = useMemo(() => account?.oid, [account]);
   const filteredChats = useMemo(() => chats.filter((c) => !c.viewpoint?.isHidden), [chats]);
@@ -81,8 +97,7 @@ function TeamsLite() {
     setInitError(null);
     try {
       const acc = await signIn(config);
-      const claims = (acc as any).idTokenClaims ?? {};
-      setAccount({ name: acc.name, username: acc.username, oid: claims.oid || acc.localAccountId, tid: claims.tid || (acc as any).tenantId });
+      setAccount(toAccount(acc));
     } catch (e) {
       setInitError(String(e));
     }

@@ -28,7 +28,7 @@ export function useChats(config: TeamsConfig | null, account: { oid?: string; ti
     const onVisible = () => { if (typeof document !== "undefined" && !document.hidden) load(false); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { cancelled = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
-  }, [config, account, active]); // eslint-disable-line
+  }, [config, account, active]);
 
   async function toggleHide(chatId: string, currentlyHidden: boolean): Promise<boolean> {
     if (!config || hidingId || !account?.oid || !account?.tid) return false;

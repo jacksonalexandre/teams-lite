@@ -17,9 +17,17 @@ function colorFromName(name: string) {
 
 function useUserPhoto(cfg: TeamsConfig | null, userId?: string | null) {
   const [url, setUrl] = useState<string | null>(null);
+  const key = cfg && userId ? userId : null;
+  const [prevKey, setPrevKey] = useState<string | null>(null);
+
+  if (prevKey !== key) {
+    setPrevKey(key);
+    setUrl(null);
+  }
+
   useEffect(() => {
+    if (!cfg || !userId) return;
     let cancelled = false;
-    if (!cfg || !userId) { setUrl(null); return; }
     getUserPhotoUrl(cfg, userId).then((u) => { if (!cancelled) setUrl(u); });
     return () => { cancelled = true; };
   }, [cfg, userId]);
