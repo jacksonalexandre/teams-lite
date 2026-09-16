@@ -203,4 +203,4 @@ bun run build
 
 ## Licença
 
-Ainda não definida. Até que um arquivo `LICENSE` seja adicionado, todos os direitos são reservados — o código está público para leitura e referência, mas não há concessão explícita de uso.
+[MIT](LICENSE). Use, modifique e distribua à vontade, mantendo o aviso de copyright.
