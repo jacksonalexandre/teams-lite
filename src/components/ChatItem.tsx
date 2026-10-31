@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import type { GraphChat } from "@/lib/graph";
 import type { TeamsConfig } from "@/lib/msal";
@@ -5,7 +6,7 @@ import { Avatar } from "./Avatar";
 import { stripHtml, formatListDate } from "@/lib/format";
 import { chatTitle } from "@/lib/graph";
 
-export function ChatItem({
+export const ChatItem = memo(function ChatItem({
   chat,
   active,
   meId,
@@ -21,7 +22,7 @@ export function ChatItem({
   meName?: string;
   hidingId: string | null;
   cfg?: TeamsConfig | null;
-  onSelect: () => void;
+  onSelect: (chatId: string) => void;
   onToggleHide: (id: string, hidden: boolean) => void;
 }) {
   const isHidden = !!chat.viewpoint?.isHidden;
@@ -30,9 +31,10 @@ export function ChatItem({
   const previewAuthor = preview?.from?.user?.displayName;
   const previewIsMe = !!meName && previewAuthor === meName;
   const rawPreview = preview?.body?.content ?? "";
-  const previewStripped = preview?.body?.content
-    ? preview.body.contentType === "html" ? stripHtml(preview.body.content) : preview.body.content
-    : "";
+  const previewStripped = useMemo(
+    () => !rawPreview ? "" : preview?.body?.contentType === "html" ? stripHtml(rawPreview) : rawPreview,
+    [rawPreview, preview?.body?.contentType],
+  );
   const previewText = previewStripped.trim() || (/<img\b/i.test(rawPreview) ? "📷 Imagem" : "");
   const previewPrefix = previewIsMe ? "Você: " : previewAuthor ? `${previewAuthor.split(" ")[0]}: ` : "";
   const isGroup = chat.chatType === "group" || chat.chatType === "meeting";
@@ -41,7 +43,7 @@ export function ChatItem({
 
   return (
     <div
-      onClick={onSelect}
+      onClick={() => onSelect(chat.id)}
       className={`group flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-2.5 text-sm transition-colors ${active ? "bg-muted" : "hover:bg-muted/60"}`}
       title={title}
     >
@@ -69,4 +71,4 @@ export function ChatItem({
       </div>
     </div>
   );
-}
+});

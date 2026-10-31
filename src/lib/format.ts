@@ -1,8 +1,8 @@
 export function stripHtml(html: string) {
   if (typeof window === "undefined") return html.replace(/<[^>]*>/g, "");
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent || div.innerText || "";
+  // DOMParser builds an inert document: unlike innerHTML on a live element,
+  // it does not start downloading the <img> tags in the preview.
+  return new DOMParser().parseFromString(html, "text/html").body.textContent || "";
 }
 
 export function toDateKey(iso: string) {

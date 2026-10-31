@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { TeamsConfig } from "@/lib/msal";
 import { listChats, hideChat, type GraphChat } from "@/lib/graph";
+import { reconcile } from "@/lib/reconcile";
 
 export function useChats(config: TeamsConfig | null, account: { oid?: string; tid?: string } | null, active: boolean) {
   const [chats, setChats] = useState<GraphChat[]>([]);
@@ -15,7 +16,7 @@ export function useChats(config: TeamsConfig | null, account: { oid?: string; ti
       if (showLoader) setLoading(true);
       try {
         const cs = await listChats(config);
-        if (!cancelled) setChats(cs);
+        if (!cancelled) setChats((prev) => reconcile(prev, cs));
       } catch (e) {
         if (!cancelled && showLoader) setError(String(e));
       } finally {
@@ -30,7 +31,7 @@ export function useChats(config: TeamsConfig | null, account: { oid?: string; ti
     return () => { cancelled = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, [config, account, active]);
 
-  async function toggleHide(chatId: string, currentlyHidden: boolean): Promise<boolean> {
+  const toggleHide = useCallback(async (chatId: string, currentlyHidden: boolean): Promise<boolean> => {
     if (!config || hidingId || !account?.oid || !account?.tid) return false;
     setHidingId(chatId);
     try {
@@ -47,7 +48,7 @@ export function useChats(config: TeamsConfig | null, account: { oid?: string; ti
     } finally {
       setHidingId(null);
     }
-  }
+  }, [config, account, hidingId]);
 
   return { chats, loading, hidingId, error, toggleHide, setChats };
 }

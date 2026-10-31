@@ -2,71 +2,129 @@ import { getAccessToken, type TeamsConfig } from "./msal";
 
 const GRAPH = "https://graph.microsoft.com/v1.0";
 
-async function graphFetch(cfg: TeamsConfig, path: string, init: RequestInit = {}) {
+// =========== Throttling (HTTP 429) ===========
+// One gate for the whole app: after a 429, every Graph call fails fast until
+// the window passes, so polling stops hitting the API instead of piling on.
+
+let throttledUntil = 0;
+let throttleStreak = 0;
+
+function isThrottled() {
+  return Date.now() < throttledUntil;
+}
+
+function registerThrottle(res: Response) {
+  const header = Number(res.headers.get("Retry-After"));
+  throttleStreak++;
+  const fallback = Math.min(30 * 2 ** (throttleStreak - 1), 300);
+  throttledUntil = Date.now() + (Number.isFinite(header) && header > 0 ? header : fallback) * 1000;
+}
+
+async function authorizedFetch(cfg: TeamsConfig, url: string, init: RequestInit = {}) {
+  if (isThrottled()) throw new Error("Graph 429: aguardando o fim do throttling");
   const token = await getAccessToken(cfg);
-  const res = await fetch(`${GRAPH}${path}`, {
+  const res = await fetch(url, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init.headers || {}),
-    },
+    headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+  });
+  if (res.status === 429) registerThrottle(res);
+  else if (res.ok) throttleStreak = 0;
+  return res;
+}
+
+async function graphFetch(cfg: TeamsConfig, path: string, init: RequestInit = {}) {
+  const res = await authorizedFetch(cfg, `${GRAPH}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init.headers || {}) },
   });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Graph ${res.status}: ${body}`);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
-// =========== User photos (cached object URLs) ===========
+// =========== Blob caches (object URLs, LRU) ===========
+// Object URLs pin their blob in memory until revoked, so the caches are
+// bounded and revoke whatever they evict. A loader returns null for content
+// that does not exist (cached) and throws on transient failures (not cached).
 
-const photoCache = new Map<string, Promise<string | null>>();
+class BlobUrlCache {
+  private entries = new Map<string, Promise<string | null>>();
+  constructor(private max: number) {}
+
+  get(key: string, load: () => Promise<Blob | null>): Promise<string | null> {
+    const hit = this.entries.get(key);
+    if (hit) {
+      this.entries.delete(key);
+      this.entries.set(key, hit);
+      return hit;
+    }
+    const p = load()
+      .then((blob) => (blob ? URL.createObjectURL(blob) : null))
+      .catch(() => {
+        this.entries.delete(key);
+        return null;
+      });
+    this.entries.set(key, p);
+    this.evict();
+    return p;
+  }
+
+  private evict() {
+    while (this.entries.size > this.max) {
+      const [key, p] = this.entries.entries().next().value!;
+      this.entries.delete(key);
+      p.then((url) => { if (url) URL.revokeObjectURL(url); });
+    }
+  }
+}
+
+// =========== User photos ===========
+
+const photoCache = new BlobUrlCache(200);
 
 export function getUserPhotoUrl(cfg: TeamsConfig, userId: string): Promise<string | null> {
   if (!userId) return Promise.resolve(null);
-  const cached = photoCache.get(userId);
-  if (cached) return cached;
-  const p = (async () => {
-    try {
-      const token = await getAccessToken(cfg);
-      const res = await fetch(`${GRAPH}/users/${userId}/photo/$value`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-      const blob = await res.blob();
-      return URL.createObjectURL(blob);
-    } catch {
-      return null;
-    }
-  })();
-  photoCache.set(userId, p);
-  return p;
+  return photoCache.get(userId, async () => {
+    // 96x96 covers the largest avatar (40px) on 2x screens; fall back to the
+    // original only when Graph has no resized version.
+    let res = await authorizedFetch(cfg, `${GRAPH}/users/${userId}/photos/96x96/$value`);
+    if (res.status === 404) res = await authorizedFetch(cfg, `${GRAPH}/users/${userId}/photo/$value`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Graph ${res.status}`);
+    return res.blob();
+  });
 }
 
 // =========== Hosted contents (inline images in messages) ===========
 
-const hostedContentCache = new Map<string, Promise<string | null>>();
+const hostedContentCache = new BlobUrlCache(60);
 
 export function getHostedContentUrl(cfg: TeamsConfig, url: string): Promise<string | null> {
   if (!url) return Promise.resolve(null);
-  const cached = hostedContentCache.get(url);
-  if (cached) return cached;
-  const p = (async () => {
-    try {
-      const token = await getAccessToken(cfg);
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-      const blob = await res.blob();
-      return URL.createObjectURL(blob);
-    } catch {
-      return null;
+  return hostedContentCache.get(url, async () => {
+    const res = await authorizedFetch(cfg, url);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Graph ${res.status}`);
+    return res.blob();
+  });
+}
+
+// =========== Concurrency ===========
+
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
     }
-  })();
-  hostedContentCache.set(url, p);
-  return p;
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 export type GraphChatMember = {
@@ -103,6 +161,7 @@ export type GraphAttachment = {
 export type GraphMessage = {
   id: string;
   createdDateTime: string;
+  lastModifiedDateTime?: string;
   from?: {
     user?: { displayName?: string; id?: string };
   } | null;
@@ -124,24 +183,14 @@ export async function hideChat(
   hide: boolean,
   user: { id: string; tenantId: string },
 ) {
-  const token = await getAccessToken(cfg);
-  const res = await fetch(`${GRAPH}/chats/${chatId}/hideForUser`, {
+  await graphFetch(cfg, `/chats/${chatId}/hideForUser`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify({
       user: { id: user.id, tenantId: user.tenantId },
       hideForUser: hide,
     }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Graph ${res.status}: ${body}`);
-  }
 }
-
 
 export async function listMessages(cfg: TeamsConfig, chatId: string): Promise<GraphMessage[]> {
   const data = await graphFetch(cfg, `/me/chats/${chatId}/messages?$top=50`);
@@ -227,7 +276,7 @@ export async function getChannelLastMessageDate(
       cfg,
       `/teams/${teamId}/channels/${channelId}/messages?$top=1`,
     );
-    const first = (data.value as Array<GraphMessage & { lastModifiedDateTime?: string }>)[0];
+    const first = (data.value as GraphMessage[])[0];
     return first?.lastModifiedDateTime ?? first?.createdDateTime ?? null;
   } catch {
     return null;

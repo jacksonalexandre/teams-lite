@@ -1,8 +1,9 @@
+import { memo } from "react";
 import type { GraphTeam, GraphChannel } from "@/lib/graph";
 import { Avatar } from "./Avatar";
 import { formatListDate } from "@/lib/format";
 
-export function ChannelItem({
+export const ChannelItem = memo(function ChannelItem({
   team,
   channel,
   lastDate,
@@ -13,12 +14,12 @@ export function ChannelItem({
   channel: GraphChannel;
   lastDate: string | null;
   active: boolean;
-  onSelect: () => void;
+  onSelect: (teamId: string, channelId: string) => void;
 }) {
   const fullTitle = `${team.displayName} · #${channel.displayName}`;
   return (
     <div
-      onClick={onSelect}
+      onClick={() => onSelect(team.id, channel.id)}
       title={fullTitle}
       className={`flex w-full cursor-pointer items-center gap-3 border-b border-border px-3 py-2.5 text-sm transition-colors ${
         active ? "bg-muted" : "hover:bg-muted/60"
@@ -34,4 +35,4 @@ export function ChannelItem({
       </div>
     </div>
   );
-}
+});

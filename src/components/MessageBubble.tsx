@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, memo, type CSSProperties } from "react";
 import { AlertCircle, Loader2, X } from "lucide-react";
 import type { GraphMessage } from "@/lib/graph";
 import type { TeamsConfig } from "@/lib/msal";
@@ -112,10 +112,13 @@ function AttachmentChip({ a, mine }: { a: NonNullable<GraphMessage["attachments"
   );
 }
 
-export function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
+export const MessageBubble = memo(function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: string; cfg?: TeamsConfig | null }) {
   const author = m.from?.user?.displayName ?? "Sistema";
   const mine = !!meName && author === meName;
-  const { text, images } = m.body.contentType === "html" ? parseMessageHtml(m.body.content) : { text: m.body.content, images: [] as ParsedImage[] };
+  const { text, images } = useMemo(
+    () => m.body.contentType === "html" ? parseMessageHtml(m.body.content) : { text: m.body.content, images: [] as ParsedImage[] },
+    [m.body.contentType, m.body.content],
+  );
   const attachments = (m.attachments ?? []).filter((a) => !!a);
   if (!text.trim() && attachments.length === 0 && images.length === 0) return null;
   const fromUserId = m.from?.user?.id ?? undefined;
@@ -145,7 +148,7 @@ export function MessageBubble({ m, meName, cfg }: { m: GraphMessage; meName?: st
       </div>
     </div>
   );
-}
+});
 
 export function PendingBubble({
   p,

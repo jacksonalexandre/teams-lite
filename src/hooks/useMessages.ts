@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { TeamsConfig } from "@/lib/msal";
 import { listMessages, listChannelMessages, sendMessage, sendChannelMessage, type GraphMessage } from "@/lib/graph";
+import { reconcile } from "@/lib/reconcile";
 
 type Selection =
   | { kind: "chat"; chatId: string }
@@ -29,7 +30,7 @@ export function useMessages(config: TeamsConfig | null, selection: Selection) {
         const msgs = selection.kind === "chat"
           ? await listMessages(config, selection.chatId)
           : await listChannelMessages(config, selection.teamId, selection.channelId);
-        if (!cancelled) setMessages(msgs);
+        if (!cancelled) setMessages((prev) => reconcile(prev, msgs));
       } catch (e) {
         if (!cancelled && showLoader) setError(String(e));
       } finally {
@@ -50,10 +51,12 @@ export function useMessages(config: TeamsConfig | null, selection: Selection) {
     try {
       if (selection.kind === "chat") {
         await sendMessage(config, selection.chatId, p.text);
-        setMessages(await listMessages(config, selection.chatId));
+        const msgs = await listMessages(config, selection.chatId);
+        setMessages((prev) => reconcile(prev, msgs));
       } else {
         await sendChannelMessage(config, selection.teamId, selection.channelId, p.text);
-        setMessages(await listChannelMessages(config, selection.teamId, selection.channelId));
+        const msgs = await listChannelMessages(config, selection.teamId, selection.channelId);
+        setMessages((prev) => reconcile(prev, msgs));
       }
       setPending((prev) => prev.filter((x) => x.id !== p.id));
     } catch (e) {

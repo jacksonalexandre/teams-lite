@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Video } from "lucide-react";
+import { Video } from "lucide-react";
 import { signIn, signOut, ensureInit, getCurrentAccount, type TeamsConfig } from "@/lib/msal";
 import type { AccountInfo } from "@azure/msal-browser";
 import { getTeamsConfig } from "@/lib/config.functions";
@@ -14,6 +14,7 @@ import { ChannelItem } from "@/components/ChannelItem";
 import { MessageBubble, PendingBubble } from "@/components/MessageBubble";
 import { DateSeparator } from "@/components/DateSeparator";
 import { Avatar } from "@/components/Avatar";
+import { Composer } from "@/components/Composer";
 import { toDateKey } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
@@ -48,7 +49,6 @@ function TeamsLite() {
   const [account, setAccount] = useState<AppAccount | null>(null);
   const [mode, setMode] = useState<Mode>("chats");
   const [selection, setSelection] = useState<Selection>(null);
-  const [draft, setDraft] = useState("");
   const [msgsVisibleCount, setMsgsVisibleCount] = useState(7);
   const [prevSelKey, setPrevSelKey] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
@@ -114,12 +114,15 @@ function TeamsLite() {
     }
   }
 
-  async function handleSend() {
-    if (!draft.trim()) return;
-    const text = draft.trim();
-    setDraft("");
-    await send(text);
-  }
+  const selectChat = useCallback((chatId: string) => setSelection({ kind: "chat", chatId }), []);
+  const selectChannel = useCallback(
+    (teamId: string, channelId: string) => setSelection({ kind: "channel", teamId, channelId }),
+    [],
+  );
+  const handleToggleHide = useCallback(async (id: string, hidden: boolean) => {
+    const ok = await toggleHide(id, hidden);
+    if (ok) setSelection((s) => (s?.kind === "chat" && s.chatId === id ? null : s));
+  }, [toggleHide]);
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -189,11 +192,8 @@ function TeamsLite() {
                     meName={account.name}
                     hidingId={hidingId}
                     cfg={config}
-                    onSelect={() => setSelection({ kind: "chat", chatId: c.id })}
-                    onToggleHide={async (id, hidden) => {
-                      const ok = await toggleHide(id, hidden);
-                      if (ok && selection?.kind === "chat" && selection.chatId === id) setSelection(null);
-                    }}
+                    onSelect={selectChat}
+                    onToggleHide={handleToggleHide}
                   />
                 ))
               )
@@ -209,7 +209,7 @@ function TeamsLite() {
                   channel={channel}
                   lastDate={lastDate}
                   active={selection?.kind === "channel" && selection.teamId === team.id && selection.channelId === channel.id}
-                  onSelect={() => setSelection({ kind: "channel", teamId: team.id, channelId: channel.id })}
+                  onSelect={selectChannel}
                 />
               ))
             )}
@@ -312,26 +312,7 @@ function TeamsLite() {
                   </button>
                 )}
               </div>
-              <div className="border-t border-border bg-card px-4 py-3">
-                <div className="flex items-end gap-2">
-                  <textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Escreva uma mensagem… (Enter envia, Shift+Enter quebra linha)"
-                    rows={1}
-                    className="max-h-40 min-h-[40px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!draft.trim() || sending}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    {sending && <Loader2 size={14} className="animate-spin" />}
-                    {sending ? "Enviando…" : "Enviar"}
-                  </button>
-                </div>
-              </div>
+              <Composer sending={sending} onSend={send} />
             </>
           )}
         </main>
